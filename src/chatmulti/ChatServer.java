@@ -1,7 +1,7 @@
 package chatmulti;
 
 import javax.swing.*;
-import javax.swing.border.EmptyBorder;
+import javax.swing.border.TitledBorder;
 import java.awt.*;
 import java.io.*;
 import java.net.*;
@@ -16,52 +16,47 @@ public class ChatServer extends JFrame {
     private ServerSocket serverSocket;
     private static final Set<MemberProcessor> members = Collections.synchronizedSet(new HashSet<>());
     private static final List<String> history = Collections.synchronizedList(new ArrayList<>());
-    
     private JTextArea logArea;
     private JButton btnStart, btnStop;
     private JLabel lblStatus;
 
     public ChatServer() {
-        setTitle("Server Control Center");
-        setSize(550, 500);
+        setTitle("Server Frame");
+        setSize(600, 500);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
-        getContentPane().setBackground(new Color(15, 15, 25));
 
-        // Header
-        JPanel header = new JPanel(new GridLayout(2, 1));
-        header.setOpaque(false);
-        JLabel title = new JLabel("SERVER CONFIG", SwingConstants.CENTER);
-        title.setForeground(new Color(0, 212, 170));
-        title.setFont(new Font("Segoe UI", Font.BOLD, 20));
-        lblStatus = new JLabel("● OFFLINE", SwingConstants.CENTER);
-        lblStatus.setForeground(Color.GRAY);
-        header.add(title);
-        header.add(lblStatus);
+        // Top: Config
+        JPanel pnlTop = new JPanel(new GridLayout(1, 2));
+        pnlTop.setBorder(new TitledBorder("Server Config"));
+        JPanel pnlInfo = new JPanel(new GridLayout(2, 2));
+        pnlInfo.add(new JLabel("IP Address:")); pnlInfo.add(new JTextField("192.168.1.6"));
+        pnlInfo.add(new JLabel("Port:")); pnlInfo.add(new JTextField(String.valueOf(TCP_PORT)));
+        
+        JPanel pnlStatus = new JPanel(new BorderLayout());
+        pnlStatus.setBackground(Color.CYAN);
+        lblStatus = new JLabel("Status: OFFLINE", SwingConstants.CENTER);
+        pnlStatus.add(lblStatus, BorderLayout.CENTER);
+        pnlTop.add(pnlInfo); pnlTop.add(pnlStatus);
 
-        // Console Log
+        // Center: Log
         logArea = new JTextArea();
-        logArea.setBackground(new Color(10, 10, 15));
-        logArea.setForeground(new Color(0, 212, 170));
+        logArea.setBackground(Color.BLACK);
+        logArea.setForeground(Color.GREEN);
         logArea.setEditable(false);
-        logArea.setFont(new Font("Consolas", Font.PLAIN, 12));
 
-        // Buttons
-        btnStart = new JButton("START SERVER");
-        btnStop = new JButton("STOP SERVER");
+        // Bottom: Buttons
+        JPanel pnlBottom = new JPanel();
+        btnStart = new JButton("Start Server");
+        btnStop = new JButton("Stop Server");
         btnStop.setEnabled(false);
         btnStart.addActionListener(e -> startServer());
         btnStop.addActionListener(e -> stopServer());
+        pnlBottom.add(btnStart); pnlBottom.add(btnStop);
 
-        JPanel btnPanel = new JPanel(new GridLayout(1, 2, 10, 0));
-        btnPanel.setOpaque(false);
-        btnPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
-        btnPanel.add(btnStart); btnPanel.add(btnStop);
-
-        add(header, BorderLayout.NORTH);
+        add(pnlTop, BorderLayout.NORTH);
         add(new JScrollPane(logArea), BorderLayout.CENTER);
-        add(btnPanel, BorderLayout.SOUTH);
-        setLocationRelativeTo(null);
+        add(pnlBottom, BorderLayout.SOUTH);
     }
 
     private void startServer() {
@@ -70,8 +65,7 @@ public class ChatServer extends JFrame {
                 serverSocket = new ServerSocket(TCP_PORT);
                 SwingUtilities.invokeLater(() -> {
                     btnStart.setEnabled(false); btnStop.setEnabled(true);
-                    lblStatus.setText("● RUNNING"); lblStatus.setForeground(new Color(0, 212, 170));
-                    logArea.append("[Hệ thống]: Server đã khởi động trên cổng " + TCP_PORT + "\n");
+                    lblStatus.setText("Status: RUNNING..."); logArea.append("SERVER STARTED ON PORT " + TCP_PORT + "\n");
                 });
                 while (!serverSocket.isClosed()) {
                     Socket s = serverSocket.accept();
@@ -79,27 +73,27 @@ public class ChatServer extends JFrame {
                     members.add(mp);
                     new Thread(mp).start();
                 }
-            } catch (IOException e) { logArea.append("[!] Server đã dừng.\n"); }
+            } catch (IOException e) { logArea.append("Server stopped.\n"); }
         }).start();
     }
 
     private void stopServer() {
         try {
-            broadcast("SHUTDOWN|Server đang đóng...", "SYSTEM");
-            synchronized (members) { for (MemberProcessor mp : members) mp.stop(); }
+            broadcast("SHUTDOWN|Server closed.", "SYSTEM");
+            for (MemberProcessor mp : members) mp.stop();
             members.clear();
-            if (serverSocket != null) serverSocket.close();
+            serverSocket.close();
             btnStart.setEnabled(true); btnStop.setEnabled(false);
-            lblStatus.setText("● OFFLINE"); lblStatus.setForeground(Color.GRAY);
-        } catch (IOException e) { e.printStackTrace(); }
+            lblStatus.setText("Status: OFFLINE");
+        } catch (Exception e) {}
     }
 
     public static void broadcast(String msg, String type) {
         String data = type + "|" + msg;
         if (!type.equals("SYSTEM")) history.add(data);
         try (DatagramSocket ds = new DatagramSocket()) {
-            byte[] buf = data.getBytes("UTF-8");
-            ds.send(new DatagramPacket(buf, buf.length, InetAddress.getByName(MCAST_ADDR), MCAST_PORT));
+            byte[] b = data.getBytes("UTF-8");
+            ds.send(new DatagramPacket(b, b.length, InetAddress.getByName(MCAST_ADDR), MCAST_PORT));
         } catch (Exception e) {}
     }
 
@@ -109,7 +103,7 @@ public class ChatServer extends JFrame {
 
     public static void updateUserList() {
         StringBuilder sb = new StringBuilder("UPDATE_USERS:");
-        synchronized (members) { for (MemberProcessor m : members) sb.append(m.getClientName()).append(","); }
+        for (MemberProcessor m : members) sb.append(m.getClientName()).append(",");
         broadcast(sb.toString(), "SYSTEM");
     }
 

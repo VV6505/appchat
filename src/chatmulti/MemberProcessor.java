@@ -30,44 +30,33 @@ public class MemberProcessor implements Runnable {
                 String cmd = in.readUTF();
                 if (cmd.startsWith("MSG:")) {
                     ChatServer.broadcast(clientName + ": " + cmd.substring(4), "TEXT");
-                } else if (cmd.startsWith("IMG:")) {
-                    handleImageTransfer(cmd.substring(4));
+                } else if (cmd.startsWith("IMG:") || cmd.startsWith("FILE:")) {
+                    handleFile(cmd);
                 }
             }
         } catch (IOException e) {
-            System.out.println(clientName + " ngắt kết nối.");
-        } finally {
-            stop();
+            ChatServer.removeMember(this);
         }
     }
 
-    private void handleImageTransfer(String fileName) throws IOException {
+    private void handleFile(String cmd) throws IOException {
+        String type = cmd.startsWith("IMG:") ? "IMAGE" : "FILE";
+        String fileName = cmd.substring(4);
         long size = in.readLong();
-        File dir = new File("server_storage/images");
+        File dir = new File("server_storage/" + type.toLowerCase() + "s");
         if (!dir.exists()) dir.mkdirs();
-        
         File file = new File(dir, System.currentTimeMillis() + "_" + fileName);
         try (FileOutputStream fos = new FileOutputStream(file)) {
-            byte[] buffer = new byte[4096];
-            int read;
-            long remaining = size;
-            while (remaining > 0 && (read = in.read(buffer, 0, (int)Math.min(buffer.length, remaining))) != -1) {
-                fos.write(buffer, 0, read);
-                remaining -= read;
+            byte[] buf = new byte[4096];
+            int read; long remaining = size;
+            while (remaining > 0 && (read = in.read(buf, 0, (int)Math.min(buf.length, remaining))) != -1) {
+                fos.write(buf, 0, read); remaining -= read;
             }
         }
-        ChatServer.broadcast(clientName + " đã gửi một ảnh: " + fileName, "IMAGE");
+        ChatServer.broadcast(clientName + " đã gửi " + type + ": " + fileName, type);
     }
 
-    public void sendMessage(String msg) {
-        try { out.writeUTF(msg); out.flush(); } catch (Exception e) {}
-    }
-
-    public void stop() {
-        isRunning = false;
-        ChatServer.removeMember(this);
-        try { socket.close(); } catch (IOException e) {}
-    }
-
+    public void sendMessage(String msg) { try { out.writeUTF(msg); } catch (Exception e) {} }
+    public void stop() { isRunning = false; try { socket.close(); } catch (Exception e) {} }
     public String getClientName() { return clientName; }
 }
