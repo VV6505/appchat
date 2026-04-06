@@ -70,4 +70,17 @@
     nbproject/build-impl.xml file. 
 
     -->
+
+    <!-- Ghi đè clean NetBeans: tránh BUILD FAILED khi dist/ChatMulti.jar đang bị khóa (Java/IDE đang giữ file). -->
+    <target name="-do-clean">
+        <delete dir="${build.dir}" failonerror="false"/>
+        <delete dir="${dist.jlink.output}" failonerror="false"/>
+        <delete file="${dist.jar}" quiet="true" failonerror="false"/>
+        <delete dir="${dist.dir}" failonerror="false"/>
+    </target>
+
+    <!-- Trước khi đóng gói JAR: thử xóa file cũ; nếu vẫn khóa thì bước jar có thể lỗi — cần tắt app đang chạy từ JAR. -->
+    <target name="-pre-jar">
+        <delete file="${dist.jar}" quiet="true" failonerror="false"/>
+    </target>
 </project>

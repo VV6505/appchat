@@ -2,6 +2,7 @@ package chatmulti;
 
 import java.io.*;
 import java.net.*;
+import java.nio.file.Files;
 
 public class MemberProcessor implements Runnable {
     private Socket socket;
@@ -36,6 +37,7 @@ public class MemberProcessor implements Runnable {
             }
         } catch (IOException e) {
             ChatServer.removeMember(this);
+            ChatServer.updateUserList();
         }
     }
 
@@ -53,10 +55,40 @@ public class MemberProcessor implements Runnable {
                 fos.write(buf, 0, read); remaining -= read;
             }
         }
-        ChatServer.broadcast(clientName + " đã gửi " + type + ": " + fileName, type);
+        if ("IMAGE".equals(type)) {
+            final long maxImg = 5L * 1024 * 1024;
+            if (size > maxImg) {
+                ChatServer.broadcast(clientName + " — ảnh quá lớn (tối đa 5MB): " + fileName, "TEXT");
+                return;
+            }
+            byte[] raw = Files.readAllBytes(file.toPath());
+            ChatServer.broadcastImage(clientName, fileName, raw);
+        } else {
+            ChatServer.broadcast(clientName + " đã gửi " + type + ": " + fileName, type);
+        }
     }
 
     public void sendMessage(String msg) { try { out.writeUTF(msg); } catch (Exception e) {} }
+
+    /** Bản sao tin realtime / cập nhật list qua TCP (ổn định); server vẫn multicast UDP song song. */
+    public void sendLive(String typePipeMsg) {
+        try {
+            out.writeUTF("LIVE:" + typePipeMsg);
+        } catch (Exception e) { }
+    }
+
+    /** Gửi ảnh nhị phân tới client (sau đó client hiển thị ImageIcon). */
+    public void sendImageChunk(String sender, String fileName, byte[] data) {
+        try {
+            out.writeUTF("IMGCHUNK");
+            out.writeUTF(sender);
+            out.writeUTF(fileName);
+            out.writeInt(data.length);
+            out.write(data);
+            out.flush();
+        } catch (IOException e) { }
+    }
+
     public void stop() { isRunning = false; try { socket.close(); } catch (Exception e) {} }
     public String getClientName() { return clientName; }
 }
