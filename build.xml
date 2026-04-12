@@ -90,12 +90,12 @@
         <property name="dist.client.jar" location="${dist.dir}/client.jar"/>
         <jar jarfile="${dist.server.jar}" basedir="${build.classes.dir}" manifestencoding="UTF-8">
             <manifest>
-                <attribute name="Main-Class" value="chatmulti.ui.serverui.ServerUI"/>
+                <attribute name="Main-Class" value="chatmulti.ui.ServerUI"/>
             </manifest>
         </jar>
         <jar jarfile="${dist.client.jar}" basedir="${build.classes.dir}" manifestencoding="UTF-8">
             <manifest>
-                <attribute name="Main-Class" value="chatmulti.ui.client.Client"/>
+                <attribute name="Main-Class" value="chatmulti.ui.Client"/>
             </manifest>
         </jar>
         <echo message="Built: ${dist.server.jar} and ${dist.client.jar}"/>
