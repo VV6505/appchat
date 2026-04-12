@@ -3,18 +3,31 @@ ChatMulti — đóng gói server.jar và client.jar
 
 Yêu cầu: JDK 21 (nbproject/project.properties: javac.source / javac.target = 21).
 
-1) NetBeans: Clean and Build (F11), sau đó chạy Ant target "jars":
-   - Chuột phải project → Run Target → Other Targets → jars
-   Hoặc dòng lệnh tại thư mục project:
+0) NetBeans Clean and Build (F11) hoặc ant jar:
+   - Luôn tạo dist\ChatMulti.jar (main.class trong project.properties).
+   - Tự tạo thêm dist\server.jar (Main ServerUI) ngay sau đó — không ghi đè ChatMulti.jar.
+
+1) Chỉ gói server (không bắt buộc chạy jar/ChatMulti trước), ví dụ máy chỉ compile rồi đóng server:
+
+     ant server-jar
+
+   File: dist\server.jar — chạy trên máy chủ: java -jar server.jar
+   (Main: chatmulti.ui.ServerUI — giao diện Swing; máy Azure Windows có desktop
+   hoặc RDP thì chạy bình thường; Linux không GUI cần cấu hình hiển thị ảo nếu dùng.)
+
+2) Gói cả server + client:
 
      ant jars
 
-2) Kết quả trong thư mục dist\:
+   Hoặc NetBeans: Run Target → Other Targets → server-jar hoặc jars.
+
+3) Kết quả trong thư mục dist\:
    - server.jar  → java -jar server.jar   (Main: chatmulti.ui.ServerUI)
    - client.jar  → double-click hoặc java -jar client.jar (Main: chatmulti.ui.Client)
 
-3) ChatMulti.jar (build mặc định của NetBeans) dùng main.class trong
+4) ChatMulti.jar (build mặc định) dùng main.class trong
    nbproject/project.properties — hiện là chatmulti.ui.Client.
+   Cùng thư mục dist\ luôn có thêm server.jar sau mỗi lần build JAR chuẩn (xem mục 0).
 
 Cấu trúc mã nguồn (UI):
    src/chatmulti/ui/ServerUI.java  — package chatmulti.ui

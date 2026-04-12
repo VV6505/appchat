@@ -84,20 +84,37 @@
         <delete file="${dist.jar}" quiet="true" failonerror="false"/>
     </target>
 
-    <!-- Hai JAR riêng: server (quản trị) và client (double-click). Cần compile trước (F11 hoặc ant jar). -->
-    <target name="jars" depends="jar">
+    <!-- Sau khi NetBeans/Ant tạo dist/ChatMulti.jar: tạo thêm dist/server.jar (giữ nguyên ChatMulti.jar). -->
+    <target name="-post-jar">
+        <antcall target="server-jar"/>
+    </target>
+
+    <!-- Chỉ server.jar — deploy Azure/VPS; cũng được gọi tự động sau mỗi lần build ChatMulti.jar (-post-jar). -->
+    <target name="server-jar" depends="compile" description="Gói dist/server.jar (Main chatmulti.ui.ServerUI) để deploy server.">
+        <mkdir dir="${dist.dir}"/>
         <property name="dist.server.jar" location="${dist.dir}/server.jar"/>
-        <property name="dist.client.jar" location="${dist.dir}/client.jar"/>
+        <delete file="${dist.server.jar}" quiet="true" failonerror="false"/>
         <jar jarfile="${dist.server.jar}" basedir="${build.classes.dir}" manifestencoding="UTF-8">
             <manifest>
                 <attribute name="Main-Class" value="chatmulti.ui.ServerUI"/>
             </manifest>
         </jar>
+        <echo message="Server JAR (deploy): ${dist.server.jar}"/>
+    </target>
+
+    <!-- Hai JAR: server + client. Có thể dùng ant server-jar riêng khi chỉ deploy server lên Azure. -->
+    <target name="jars" depends="server-jar,client-jar">
+        <echo message="Built: ${dist.server.jar} and ${dist.client.jar}"/>
+    </target>
+
+    <target name="client-jar" depends="compile" description="Gói dist/client.jar (Main chatmulti.ui.Client).">
+        <mkdir dir="${dist.dir}"/>
+        <property name="dist.client.jar" location="${dist.dir}/client.jar"/>
+        <delete file="${dist.client.jar}" quiet="true" failonerror="false"/>
         <jar jarfile="${dist.client.jar}" basedir="${build.classes.dir}" manifestencoding="UTF-8">
             <manifest>
                 <attribute name="Main-Class" value="chatmulti.ui.Client"/>
             </manifest>
         </jar>
-        <echo message="Built: ${dist.server.jar} and ${dist.client.jar}"/>
     </target>
 </project>
