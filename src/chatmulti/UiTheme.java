@@ -24,14 +24,14 @@ public final class UiTheme {
     public static final Color BORDER = new Color(185, 192, 205);
     public static final Color TEXT = new Color(22, 27, 34);
     public static final Color TEXT_MUTED = new Color(75, 83, 96);
-    /** Nút chính: nền đậm để chữ trắng đọc rõ (Windows LAF hay bỏ qua màu nếu không dùng BasicButtonUI). */
+    /** Nút chính: nền đậm để chữ trắng đọc rõ */
     public static final Color ACCENT = new Color(22, 93, 200);
     public static final Color ACCENT_DARK = new Color(16, 70, 160);
     public static final Color SUCCESS_BG = new Color(198, 232, 212);
     public static final Color SUCCESS_TEXT = new Color(10, 66, 32);
     public static final Color OFFLINE_BG = new Color(218, 222, 230);
     public static final Color OFFLINE_TEXT = new Color(55, 60, 70);
-    /** Nền nút phụ: xám nhạt nhưng đủ tương phản với chữ đen. */
+    /** Nền nút phụ: xám nhạt */
     public static final Color BUTTON_SECONDARY_BG = new Color(222, 226, 234);
     public static final Color BUBBLE_ME = new Color(22, 93, 200);
     public static final Color BUBBLE_ME_TEXT = Color.WHITE;
@@ -79,7 +79,6 @@ public final class UiTheme {
                 BorderFactory.createEmptyBorder(12, 12, 12, 12));
     }
 
-    /** Thanh accent mỏng phía trên cửa sổ chat. */
     public static JPanel accentBar() {
         JPanel p = new JPanel();
         p.setPreferredSize(new Dimension(0, 5));

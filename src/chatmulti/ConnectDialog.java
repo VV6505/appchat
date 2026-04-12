@@ -5,6 +5,7 @@ import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
 import java.awt.*;
 import java.net.*;
+import java.util.function.Consumer;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashSet;
@@ -50,7 +51,7 @@ public final class ConnectDialog {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.weightx = 1;
         JTextField txtIP = new JTextField(18);
-        txtIP.setToolTipText("Máy khác: IP LAN server. Cùng máy với server: có thể gõ 127.0.0.1 (app tự xử lý nếu nhập đúng IP của máy).");
+        txtIP.setToolTipText("Tự động quét khi mở cửa sổ. Nếu không thấy: 127.0.0.1 nếu server trên cùng máy, hoặc IP LAN máy chạy server.");
         txtIP.setFont(lf);
         txtIP.setBorder(BorderFactory.createCompoundBorder(
                 new LineBorder(UiTheme.BORDER, 1), new EmptyBorder(6, 8, 6, 8)));
@@ -83,7 +84,7 @@ public final class ConnectDialog {
 
         JPanel btns = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
         btns.setOpaque(false);
-        JButton btnAuto = new JButton("Tự động tìm (WiFi)");
+        JButton btnAuto = new JButton("Tự động tìm lại");
         JButton btnOk = new JButton("Kết nối");
         JButton btnCancel = new JButton("Hủy");
         UiTheme.styleSecondaryButton(btnAuto);
@@ -94,11 +95,20 @@ public final class ConnectDialog {
         btns.add(btnCancel);
 
         final Result[] holder = { null };
+        @SuppressWarnings("unchecked")
+        final SwingWorker<Result, Void>[] activeWorker = new SwingWorker[1];
+
+        Consumer<Boolean> setFormBusy = busy -> {
+            txtIP.setEnabled(!busy);
+            txtPort.setEnabled(!busy);
+            btnOk.setEnabled(!busy);
+            btnAuto.setEnabled(!busy);
+        };
 
         Runnable applyResult = () -> {
             String host = txtIP.getText().trim();
             if (host.isEmpty()) {
-                JOptionPane.showMessageDialog(dlg, "Nhập IP máy chạy server, hoặc dùng \"Tự động tìm\".", "Thiếu IP", JOptionPane.WARNING_MESSAGE);
+                JOptionPane.showMessageDialog(dlg, "Nhập IP hoặc bấm \"Tự động tìm lại\".", "Thiếu IP", JOptionPane.WARNING_MESSAGE);
                 return;
             }
             int port;
@@ -113,23 +123,26 @@ public final class ConnectDialog {
         };
 
         btnOk.addActionListener(e -> applyResult.run());
-        btnCancel.addActionListener(e -> dlg.dispose());
+        btnCancel.addActionListener(e -> {
+            if (activeWorker[0] != null) activeWorker[0].cancel(true);
+            dlg.dispose();
+        });
 
-        btnAuto.addActionListener(e -> {
-            btnAuto.setEnabled(false);
-            btnOk.setEnabled(false);
+        Consumer<Boolean> runDiscover = autoConnectOnSuccess -> {
+            if (activeWorker[0] != null && !activeWorker[0].isDone()) activeWorker[0].cancel(true);
+            setFormBusy.accept(true);
             lblStatus.setForeground(UiTheme.TEXT_MUTED);
-            lblStatus.setText("Đang tìm server trên mạng LAN...");
-            new SwingWorker<Result, Void>() {
+            lblStatus.setText("Đang tự động tìm server trên LAN (UDP)...");
+            SwingWorker<Result, Void> w = new SwingWorker<Result, Void>() {
                 @Override
                 protected Result doInBackground() {
-                    return discoverServer(3500);
+                    return discoverServer(4000);
                 }
 
                 @Override
                 protected void done() {
-                    btnAuto.setEnabled(true);
-                    btnOk.setEnabled(true);
+                    if (isCancelled() || !dlg.isDisplayable()) return;
+                    setFormBusy.accept(false);
                     try {
                         Result r = get();
                         if (r != null) {
@@ -137,19 +150,27 @@ public final class ConnectDialog {
                             txtPort.setText(String.valueOf(r.port));
                             lblStatus.setForeground(UiTheme.SUCCESS_TEXT);
                             lblStatus.setText("Đã tìm thấy: " + r.host + ":" + r.port);
-                            holder[0] = r;
-                            dlg.dispose();
+                            if (autoConnectOnSuccess) {
+                                holder[0] = r;
+                                dlg.dispose();
+                            }
                         } else {
+                            if (txtIP.getText().trim().isEmpty())
+                                txtIP.setText("127.0.0.1");
                             lblStatus.setForeground(new Color(180, 90, 30));
-                            lblStatus.setText("Không tìm thấy. Kiểm tra server đã Start và cùng WiFi; hoặc nhập IP.");
+                            lblStatus.setText("Không quét được. Kiểm tra server đã Start; đã gợi ý 127.0.0.1 nếu cùng máy — sửa IP nếu cần.");
                         }
                     } catch (Exception ex) {
                         lblStatus.setForeground(new Color(180, 50, 50));
                         lblStatus.setText("Lỗi khi tìm server.");
                     }
                 }
-            }.execute();
-        });
+            };
+            activeWorker[0] = w;
+            w.execute();
+        };
+
+        btnAuto.addActionListener(e -> runDiscover.accept(false));
 
         dlg.setLayout(new BorderLayout(10, 12));
         dlg.getRootPane().setBorder(new EmptyBorder(12, 14, 14, 14));
@@ -157,6 +178,9 @@ public final class ConnectDialog {
         dlg.add(btns, BorderLayout.SOUTH);
         dlg.pack();
         dlg.setLocationRelativeTo(owner);
+
+        SwingUtilities.invokeLater(() -> runDiscover.accept(true));
+
         dlg.setVisible(true);
         return holder[0];
     }
@@ -169,6 +193,9 @@ public final class ConnectDialog {
             socket.setSoTimeout(timeoutMs);
             byte[] reqBytes = req.getBytes(StandardCharsets.UTF_8);
             Set<InetAddress> targets = new HashSet<>();
+            targets.add(InetAddress.getByName("127.0.0.1"));
+            InetAddress lb = InetAddress.getLoopbackAddress();
+            if (lb != null && !lb.equals(InetAddress.getByName("127.0.0.1"))) targets.add(lb);
             targets.add(InetAddress.getByName("255.255.255.255"));
             for (NetworkInterface ni : Collections.list(NetworkInterface.getNetworkInterfaces())) {
                 if (!ni.isUp() || ni.isLoopback()) continue;

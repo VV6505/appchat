@@ -70,14 +70,12 @@ public class MemberProcessor implements Runnable {
 
     public void sendMessage(String msg) { try { out.writeUTF(msg); } catch (Exception e) {} }
 
-    /** Bản sao tin realtime / cập nhật list qua TCP (ổn định); server vẫn multicast UDP song song. */
     public void sendLive(String typePipeMsg) {
         try {
             out.writeUTF("LIVE:" + typePipeMsg);
         } catch (Exception e) { }
     }
 
-    /** Gửi ảnh nhị phân tới client (sau đó client hiển thị ImageIcon). */
     public void sendImageChunk(String sender, String fileName, byte[] data) {
         try {
             out.writeUTF("IMGCHUNK");

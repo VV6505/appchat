@@ -211,8 +211,7 @@ public class ChatClientUI extends JFrame {
             new Thread(() -> receiveTCP(s)).start();
         } catch (Exception e) { JOptionPane.showMessageDialog(this, "Server Not Found!"); }
     }
-
-    /** Parse payload giống multicast: {@code type|body} — nhận qua TCP LIVE (server vẫn gửi UDP song song). */
+    
     private void handleBroadcastPayload(String payload) {
         int sep = payload.indexOf('|');
         if (sep < 0 || sep >= payload.length() - 1) return;
