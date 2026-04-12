@@ -1,19 +1,27 @@
 ChatMulti — đóng gói server.jar và client.jar
 ============================================
 
-Yêu cầu: JDK 17+ (project NetBeans đang dùng Java 21).
+Yêu cầu: JDK 21 làm toolchain build (bytecode --source/--target 21 trong
+nbproject/project.properties). Không dùng JDK 22 làm JDK mặc định khi build
+nếu bạn muốn đồng bộ môi trường với JDK 21.
 
-1) NetBeans: Clean and Build (F11), sau đó chạy Ant target "jars":
-   - Chuột phải project → Run Target → Other Targets → jars
-   Hoặc dòng lệnh tại thư mục project:
+1) Dòng lệnh (Windows, khuyến nghị — tự chọn JDK 21 qua JAVA_HOME / JDK21_HOME):
+
+     .\build-jars.ps1
+
+   Hoặc sau khi đặt JAVA_HOME trỏ tới JDK 21:
 
      ant jars
 
-2) Kết quả trong thư mục dist\:
+2) NetBeans: Project Properties → Libraries → Java Platform = JDK 21.
+   Clean and Build (F11), sau đó Ant target "jars":
+   - Chuột phải project → Run Target → Other Targets → jars
+
+3) Kết quả trong thư mục dist\:
    - server.jar  → java -jar server.jar   (Main: chatmulti.ui.serverui.ServerUI)
    - client.jar  → double-click hoặc java -jar client.jar (Main: chatmulti.ui.client.Client)
 
-3) ChatMulti.jar (build mặc định của NetBeans) dùng main.class trong
+4) ChatMulti.jar (build mặc định của NetBeans) dùng main.class trong
    nbproject/project.properties — hiện là chatmulti.ui.client.Client.
 
 Cấu trúc mã nguồn (UI):
