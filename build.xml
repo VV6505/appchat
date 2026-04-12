@@ -83,4 +83,21 @@
     <target name="-pre-jar">
         <delete file="${dist.jar}" quiet="true" failonerror="false"/>
     </target>
+
+    <!-- Hai JAR riêng: server (quản trị) và client (double-click). Cần compile trước (F11 hoặc ant jar). -->
+    <target name="jars" depends="jar">
+        <property name="dist.server.jar" location="${dist.dir}/server.jar"/>
+        <property name="dist.client.jar" location="${dist.dir}/client.jar"/>
+        <jar jarfile="${dist.server.jar}" basedir="${build.classes.dir}" manifestencoding="UTF-8">
+            <manifest>
+                <attribute name="Main-Class" value="chatmulti.ui.serverui.ServerUI"/>
+            </manifest>
+        </jar>
+        <jar jarfile="${dist.client.jar}" basedir="${build.classes.dir}" manifestencoding="UTF-8">
+            <manifest>
+                <attribute name="Main-Class" value="chatmulti.ui.client.Client"/>
+            </manifest>
+        </jar>
+        <echo message="Built: ${dist.server.jar} and ${dist.client.jar}"/>
+    </target>
 </project>
