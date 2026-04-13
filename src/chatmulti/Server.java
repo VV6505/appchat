@@ -1,7 +1,6 @@
 package chatmulti;
 
 import chatmulti.ui.ServerUI;
-
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -21,6 +20,9 @@ public final class Server {
     private volatile boolean running;
     private volatile boolean shuttingDown;
 
+    private volatile boolean autoJoinDefaultRoom;
+    private volatile String defaultRoomName = "lobby";
+
     private final Map<String, ClientHandler> onlineByName = new ConcurrentHashMap<>();
     private final Set<String> waitingUsers = ConcurrentHashMap.newKeySet();
     private final Map<String, Set<String>> rooms = new ConcurrentHashMap<>();
@@ -29,6 +31,13 @@ public final class Server {
 
     public Server(ServerUI ui) {
         this.ui = ui;
+    }
+
+    public void setAutoJoinDefaultRoom(boolean enabled, String roomName) {
+        this.autoJoinDefaultRoom = enabled;
+        if (roomName != null && !roomName.isBlank()) {
+            this.defaultRoomName = roomName.trim();
+        }
     }
 
     public boolean isRunning() {
@@ -85,7 +94,11 @@ public final class Server {
     }
 
     void log(String line) {
-        if (ui != null) ui.appendLog(line);
+        if (ui != null) {
+            ui.appendLog(line);
+        } else {
+            System.out.println(line);
+        }
     }
 
     void onClientReady(ClientHandler handler, String username) {
@@ -93,6 +106,9 @@ public final class Server {
         waitingUsers.add(username);
         log(username + " connected");
         pushUi();
+        if (autoJoinDefaultRoom && defaultRoomName != null && !defaultRoomName.isEmpty()) {
+            addWaitingUserToRoom(username, defaultRoomName);
+        }
     }
 
     void registerUdpEndpoint(String username, InetSocketAddress addr) {

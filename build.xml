@@ -84,13 +84,14 @@
         <delete file="${dist.jar}" quiet="true" failonerror="false"/>
     </target>
 
-    <!-- Sau khi NetBeans/Ant tạo dist/ChatMulti.jar: tạo thêm dist/server.jar (giữ nguyên ChatMulti.jar). -->
+    <!-- Sau ChatMulti.jar: thêm server.jar (Swing) và server-headless.jar (Linux/Azure). -->
     <target name="-post-jar">
         <antcall target="server-jar"/>
+        <antcall target="server-headless-jar"/>
     </target>
 
-    <!-- Chỉ server.jar — deploy Azure/VPS; cũng được gọi tự động sau mỗi lần build ChatMulti.jar (-post-jar). -->
-    <target name="server-jar" depends="compile" description="Gói dist/server.jar (Main chatmulti.ui.ServerUI) để deploy server.">
+    <!-- server.jar — GUI ServerUI (Windows / máy có desktop). -->
+    <target name="server-jar" depends="compile" description="Gói dist/server.jar (Main chatmulti.ui.ServerUI).">
         <mkdir dir="${dist.dir}"/>
         <property name="dist.server.jar" location="${dist.dir}/server.jar"/>
         <delete file="${dist.server.jar}" quiet="true" failonerror="false"/>
@@ -99,12 +100,24 @@
                 <attribute name="Main-Class" value="chatmulti.ui.ServerUI"/>
             </manifest>
         </jar>
-        <echo message="Server JAR (deploy): ${dist.server.jar}"/>
+        <echo message="Server JAR (GUI): ${dist.server.jar}"/>
     </target>
 
-    <!-- Hai JAR: server + client. Có thể dùng ant server-jar riêng khi chỉ deploy server lên Azure. -->
-    <target name="jars" depends="server-jar,client-jar">
-        <echo message="Built: ${dist.server.jar} and ${dist.client.jar}"/>
+    <!-- server-headless.jar — không Swing, chạy trên Linux/Azure (java -jar hoặc systemd). -->
+    <target name="server-headless-jar" depends="compile" description="Gói dist/server-headless.jar (Main chatmulti.ServerHeadless).">
+        <mkdir dir="${dist.dir}"/>
+        <property name="dist.server.headless.jar" location="${dist.dir}/server-headless.jar"/>
+        <delete file="${dist.server.headless.jar}" quiet="true" failonerror="false"/>
+        <jar jarfile="${dist.server.headless.jar}" basedir="${build.classes.dir}" manifestencoding="UTF-8">
+            <manifest>
+                <attribute name="Main-Class" value="chatmulti.ServerHeadless"/>
+            </manifest>
+        </jar>
+        <echo message="Server JAR (headless): ${dist.server.headless.jar}"/>
+    </target>
+
+    <target name="jars" depends="server-jar,server-headless-jar,client-jar">
+        <echo message="Built: ${dist.server.jar}, ${dist.server.headless.jar}, ${dist.client.jar}"/>
     </target>
 
     <target name="client-jar" depends="compile" description="Gói dist/client.jar (Main chatmulti.ui.Client).">

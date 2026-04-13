@@ -22,9 +22,8 @@ public final class Client extends JFrame {
 
     private static final String PH_MSG = "Nhập tin nhắn...";
 
-    /** Sticker gửi riêng (UDP STICKER|…) — bubble lớn. */
     private static final String[] STICKERS = {"👍", "❤️", "😂", "🔥", "🎉", "👋", "✨", "🙏", "😊", "💯"};
-    /** Emoji chèn vào ô tin nhắn, gửi chung với text. */
+
     private static final String[] INLINE_EMOJIS = {
             "😀", "😃", "😄", "😁", "😅", "🤣", "😂", "🙂", "😉", "😊", "😍", "🥰",
             "😘", "😋", "😎", "🤩", "🥳", "😇", "🤔", "😴", "👍", "👎", "👏", "🙌",
@@ -217,10 +216,23 @@ public final class Client extends JFrame {
         g.gridy = y;
         g.gridwidth = 2;
         g.anchor = GridBagConstraints.CENTER;
+
+        // Nút Kết nối thủ công
         JButton btn = new JButton("Connect");
         UiTheme.stylePrimaryButton(btn);
-        btn.addActionListener(e -> doConnect());
-        wrap.add(btn, g);
+        btn.addActionListener(e -> doConnect(false)); // Lấy dữ liệu từ UI
+
+        // Nút Kết nối nhanh
+        JButton btnQuick = new JButton("Quick Connect");
+        UiTheme.styleSecondaryButton(btnQuick); 
+        btnQuick.addActionListener(e -> doConnect(true)); // Dùng mặc định 127.0.0.1
+
+        // Panel chứa 2 nút nằm ngang
+        JPanel pnlButtons = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
+        pnlButtons.setOpaque(false);
+        pnlButtons.add(btn);
+        pnlButtons.add(btnQuick);
+        wrap.add(pnlButtons, g);
 
         JPanel holder = new JPanel(new GridBagLayout());
         holder.setBackground(UiTheme.PANEL);
@@ -282,7 +294,7 @@ public final class Client extends JFrame {
         lblRoomTitle.setFont(UiTheme.uiFont(Font.BOLD, 15));
         lblRoomTitle.setForeground(UiTheme.TEXT);
         header.add(lblRoomTitle, BorderLayout.WEST);
-        JButton btnDisc = new JButton("Ngắt kết nối");
+        JButton btnDisc = new JButton("Rời khỏi phòng");
         UiTheme.styleSecondaryButton(btnDisc);
         btnDisc.addActionListener(e -> disconnectToLogin());
         header.add(btnDisc, BorderLayout.EAST);
@@ -358,23 +370,32 @@ public final class Client extends JFrame {
         return holder;
     }
 
-    private void doConnect() {
+    private void doConnect(boolean isQuick) {
         String u = textOrEmpty(tfUser, "Tên của bạn");
-        String hostRaw = textOrEmpty(tfHost, "192.168.x.x");
         if (u.isEmpty() || u.contains("|")) {
-            JOptionPane.showMessageDialog(this, "Username không hợp lệ (không được rỗng hoặc chứa |).",
+            JOptionPane.showMessageDialog(this, "Username không hợp lệ.",
                     "Lỗi", JOptionPane.WARNING_MESSAGE);
             return;
         }
-        final String host = hostRaw.isEmpty() ? "127.0.0.1" : hostRaw;
+
+        final String host;
         final int tcpPort;
         final int udpPort;
-        try {
-            tcpPort = Integer.parseInt(tfTcpPort.getText().trim());
-            udpPort = Integer.parseInt(tfUdpPort.getText().trim());
-        } catch (NumberFormatException ex) {
-            JOptionPane.showMessageDialog(this, "Port không hợp lệ.", "Lỗi", JOptionPane.ERROR_MESSAGE);
-            return;
+
+        if (isQuick) {
+            host = "192.168.2.18";
+            tcpPort = Server.TCP_PORT;
+            udpPort = Server.UDP_PORT;
+        } else {
+            String hostRaw = textOrEmpty(tfHost, "192.168.x.x");
+            host = hostRaw.isEmpty() ? "192.168.2.18" : hostRaw;
+            try {
+                tcpPort = Integer.parseInt(tfTcpPort.getText().trim());
+                udpPort = Integer.parseInt(tfUdpPort.getText().trim());
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(this, "Port không hợp lệ.", "Lỗi", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
         }
 
         stopNetworking();
@@ -431,9 +452,9 @@ public final class Client extends JFrame {
             } catch (Exception ex) {
                 String msg;
                 if (ex instanceof ConnectException || ex instanceof SocketTimeoutException)
-                    msg = "Kết nối thất bại: Server chưa cập nhật";
+                    msg = "Kết nối thất bại: Server chưa chạy hoặc sai IP";
                 else
-                    msg = "Kết nối thất bại: " + (ex.getMessage() != null ? ex.getMessage() : ex.getClass().getSimpleName());
+                    msg = "Lỗi kết nối: " + (ex.getMessage() != null ? ex.getMessage() : ex.getClass().getSimpleName());
                 SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(Client.this, msg, "Lỗi", JOptionPane.ERROR_MESSAGE));
                 stopNetworking();
             }
@@ -484,7 +505,7 @@ public final class Client extends JFrame {
         } catch (IOException ignored) {
         } finally {
             if (!closing) SwingUtilities.invokeLater(() -> {
-                JOptionPane.showMessageDialog(Client.this, "Mất kết nối server.", "Mất kết nối", JOptionPane.WARNING_MESSAGE);
+                JOptionPane.showMessageDialog(Client.this, "Đã rời khỏi nhóm chat.", "Mất kết nối", JOptionPane.WARNING_MESSAGE);
                 disconnectToLogin();
             });
         }
@@ -654,7 +675,6 @@ public final class Client extends JFrame {
         pop.show(anchor, 0, anchor.getHeight());
     }
 
-    /** Sticker riêng (bubble lớn), không gộp vào ô gõ. */
     private void showStickerPicker() {
         if (currentRoom == null) return;
         int opt = JOptionPane.showOptionDialog(this, "Chọn sticker gửi vào phòng:", "Nhãn dán",
