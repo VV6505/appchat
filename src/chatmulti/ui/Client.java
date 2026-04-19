@@ -501,6 +501,7 @@ public final class Client extends JFrame {
 
         // Placeholder — room hiện tại sẽ hiển thị ở đây
         JPanel body = new JPanel();
+        roomListPanel = body; // Gán biến này để có thể cập nhật danh sách phòng sau
         body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
         body.setOpaque(false);
 
@@ -846,7 +847,7 @@ public final class Client extends JFrame {
         g.gridx = 1;
         g.gridwidth = 2;
         g.fill = GridBagConstraints.HORIZONTAL;
-        JButton btnPurge = new JButton("Xóa dữ liệu (Clear Session)");
+        JButton btnPurge = new JButton("Xóa dữ liệu user");
         UiTheme.styleSecondaryButton(btnPurge);
         btnPurge.setForeground(new Color(0xEF4444)); // Màu đỏ cảnh báo
         btnPurge.addActionListener(e -> {
