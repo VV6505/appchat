@@ -1,6 +1,7 @@
 package chatmulti;
 
-import chatmulti.ui.ServerUI;
+import chatmulti.ui.AdminHandler;
+import chatmulti.ui.ClientHandler;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -13,7 +14,10 @@ public final class Server {
     public static final int UDP_PORT = 6000;
     public static final long MAX_FILE_BYTES = 5L * 1024 * 1024;
 
-    private final ServerUI ui;
+    // ── Admin credential (hardcoded) ──────────────────────────────────────────
+    public static final String ADMIN_USERNAME = "admin";
+    public static final String ADMIN_PASSWORD = "admin123";
+
     private volatile ServerSocket tcpSocket;
     private volatile UDPServer udpServer;
     private volatile Thread acceptThread;
@@ -29,8 +33,28 @@ public final class Server {
     private final Map<String, String> userToRoom = new ConcurrentHashMap<>();
     private final Map<String, InetSocketAddress> udpByUser = new ConcurrentHashMap<>();
 
-    public Server(ServerUI ui) {
-        this.ui = ui;
+    // ── Admin TCP connections (separate handler set) ──────────────────────────
+    private final Set<AdminHandler> adminHandlers = ConcurrentHashMap.newKeySet();
+
+    public Server() {
+        // headless — log ra System.out
+    }
+
+    // ── Headless entry point ──────────────────────────────────────────────────
+    public static void main(String[] args) {
+        System.out.println("[chatmulti] Starting server in headless mode...");
+        Server server = new Server();
+        try {
+            server.start();
+            System.out.println("[chatmulti] Server running. TCP=" + TCP_PORT + " UDP=" + UDP_PORT
+                    + " | Admin user='" + ADMIN_USERNAME + "'");
+            // Block mãi mãi — Azure / systemd sẽ kill process khi cần
+            Thread.currentThread().join();
+        } catch (IOException e) {
+            System.err.println("[chatmulti] Failed to start: " + e.getMessage());
+            System.exit(1);
+        } catch (InterruptedException ignored) {
+        }
     }
 
     public void setAutoJoinDefaultRoom(boolean enabled, String roomName) {
@@ -61,11 +85,59 @@ public final class Server {
         while (running && ss != null && !ss.isClosed()) {
             try {
                 Socket s = ss.accept();
-                ClientHandler h = new ClientHandler(s, this);
-                new Thread(h, "chatmulti-client").start();
+                // Handshake: đọc dòng đầu tiên để phân biệt admin vs user thường
+                new Thread(new InitialHandshake(s, this), "chatmulti-init").start();
             } catch (IOException e) {
                 if (running) log("Accept error: " + e.getMessage());
                 break;
+            }
+        }
+    }
+
+    /** Đọc dòng đầu tiên từ socket và quyết định route tới ClientHandler hay AdminHandler */
+    static final class InitialHandshake implements Runnable {
+        private final Socket socket;
+        private final Server server;
+
+        InitialHandshake(Socket socket, Server server) {
+            this.socket = socket;
+            this.server = server;
+        }
+
+        @Override
+        public void run() {
+            try {
+                java.io.DataInputStream in = new java.io.DataInputStream(socket.getInputStream());
+                java.io.DataOutputStream out = new java.io.DataOutputStream(socket.getOutputStream());
+                String first = in.readUTF().trim();
+
+                if (first.startsWith("ADMIN_LOGIN|")) {
+                    // Format: ADMIN_LOGIN|password
+                    String password = first.substring("ADMIN_LOGIN|".length()).trim();
+                    if (!ADMIN_PASSWORD.equals(password)) {
+                        out.writeUTF("ADMIN_ERROR|Sai mật khẩu admin");
+                        out.flush();
+                        socket.close();
+                        return;
+                    }
+                    out.writeUTF("ADMIN_OK");
+                    out.flush();
+                    server.log("Admin connected from " + socket.getRemoteSocketAddress());
+                    AdminHandler ah = new AdminHandler(socket, in, out, server);
+                    server.adminHandlers.add(ah);
+                    ah.run(); // chạy trực tiếp trên thread này
+                    server.adminHandlers.remove(ah);
+                } else if (first.startsWith("CONNECT|")) {
+                    // User thường — chuyển sang ClientHandler
+                    ClientHandler ch = new ClientHandler(socket, server, first, in, out);
+                    ch.run();
+                } else {
+                    out.writeUTF("ERROR|Unknown handshake");
+                    out.flush();
+                    socket.close();
+                }
+            } catch (IOException ignored) {
+                try { socket.close(); } catch (IOException ignored2) {}
             }
         }
     }
@@ -75,6 +147,8 @@ public final class Server {
         running = false;
         if (udpServer != null) udpServer.close();
         udpServer = null;
+        for (AdminHandler ah : new ArrayList<>(adminHandlers)) ah.close();
+        adminHandlers.clear();
         for (ClientHandler h : new ArrayList<>(onlineByName.values())) h.closeSocket();
         onlineByName.clear();
         waitingUsers.clear();
@@ -84,28 +158,20 @@ public final class Server {
         ServerSocket ss = tcpSocket;
         tcpSocket = null;
         if (ss != null) {
-            try {
-                ss.close();
-            } catch (IOException ignored) {
-            }
+            try { ss.close(); } catch (IOException ignored) {}
         }
-        pushUi();
         log("Server stopped.");
     }
 
-    void log(String line) {
-        if (ui != null) {
-            ui.appendLog(line);
-        } else {
-            System.out.println(line);
-        }
+    public void log(String line) {
+        System.out.println("[" + java.time.LocalTime.now().withNano(0) + "] " + line);
     }
 
-    void onClientReady(ClientHandler handler, String username) {
+    public void onClientReady(ClientHandler handler, String username) {
         onlineByName.put(username, handler);
         waitingUsers.add(username);
         log(username + " connected");
-        pushUi();
+        broadcastAdminEvent("USER_CONNECTED|" + username);
         if (autoJoinDefaultRoom && defaultRoomName != null && !defaultRoomName.isEmpty()) {
             addWaitingUserToRoom(username, defaultRoomName);
         }
@@ -116,25 +182,25 @@ public final class Server {
         udpByUser.put(username, addr);
     }
 
-    boolean isUsernameOnline(String name) {
+    public boolean isUsernameOnline(String name) {
         return onlineByName.containsKey(name);
     }
 
-    boolean isUserInRoom(String username, String room) {
+    public boolean isUserInRoom(String username, String room) {
         Set<String> m = rooms.get(room);
         return m != null && m.contains(username);
     }
 
-    Set<String> getRoomMembers(String room) {
+    public Set<String> getRoomMembers(String room) {
         Set<String> m = rooms.get(room);
         return m == null ? Collections.emptySet() : Collections.unmodifiableSet(new LinkedHashSet<>(m));
     }
 
-    InetSocketAddress getUdpEndpoint(String username) {
+    public InetSocketAddress getUdpEndpoint(String username) {
         return udpByUser.get(username);
     }
 
-    void removeClient(ClientHandler handler, String username) {
+    public void removeClient(ClientHandler handler, String username) {
         if (username == null) return;
         onlineByName.remove(username, handler);
         waitingUsers.remove(username);
@@ -143,20 +209,18 @@ public final class Server {
         if (room != null) {
             Set<String> set = rooms.get(room);
             if (set != null) set.remove(username);
-            /* Phòng vẫn giữ dù không còn ai — chỉ admin mới xóa phòng */
         }
         if (!shuttingDown) {
             log(username + " left (disconnect)");
             broadcastTcp("SYSTEM|" + username + " đã rời khỏi nhóm");
         }
-        pushUi();
+        broadcastAdminEvent("USER_DISCONNECTED|" + username);
     }
 
     void broadcastTcp(String line) {
         for (ClientHandler h : new ArrayList<>(onlineByName.values())) h.sendUtf(line);
     }
 
-    /** Gửi file/ảnh trong phòng (TCP), tới mọi thành viên khác người gửi. */
     void broadcastRoomFile(String fromUser, String fileName, byte[] data) {
         String room = userToRoom.get(fromUser);
         if (room == null) return;
@@ -167,10 +231,10 @@ public final class Server {
         }
     }
 
-    void handleTcpFileUpload(String username, String fileName, byte[] data) {
+    public void handleTcpFileUpload(String username, String fileName, byte[] data) {
         if (data == null || data.length == 0) return;
         if (data.length > MAX_FILE_BYTES) {
-            log(username + " — file quá lớn (tối đa 5MB): " + fileName);
+            log(username + " — file quá lớn: " + fileName);
             return;
         }
         if (userToRoom.get(username) == null) {
@@ -185,10 +249,9 @@ public final class Server {
         if (r.isEmpty()) return;
         rooms.computeIfAbsent(r, k -> ConcurrentHashMap.newKeySet());
         log("Room created: " + r);
-        pushUi();
+        broadcastAdminEvent("ROOM_CREATED|" + r);
     }
 
-    /** Xóa phòng: mọi user trong phòng trở lại chờ; gửi BACK_TO_WAITING. */
     public void deleteRoom(String roomName) {
         String r = roomName == null ? "" : roomName.trim();
         if (r.isEmpty()) return;
@@ -201,10 +264,9 @@ public final class Server {
             if (h != null) h.sendUtf("BACK_TO_WAITING");
         }
         log("Room deleted: " + r);
-        pushUi();
+        broadcastAdminEvent("ROOM_DELETED|" + r);
     }
 
-    /** Đưa user đang trong phòng về danh sách chờ. */
     public void removeUserFromRoom(String username) {
         String u = username == null ? "" : username.trim();
         if (u.isEmpty()) return;
@@ -216,7 +278,7 @@ public final class Server {
         ClientHandler h = onlineByName.get(u);
         if (h != null) h.sendUtf("BACK_TO_WAITING");
         log(u + " removed from room " + room);
-        pushUi();
+        broadcastAdminEvent("USER_ROOM_CHANGED|" + u + "|" + room + "|waiting");
     }
 
     public void addWaitingUserToRoom(String username, String roomName) {
@@ -234,7 +296,30 @@ public final class Server {
             broadcastTcp("SYSTEM|" + u + " đã vào phòng " + r);
         }
         log(u + " joined " + r);
-        pushUi();
+        broadcastAdminEvent("USER_ROOM_CHANGED|" + u + "|waiting|" + r);
+    }
+
+    /** Gửi event tới tất cả AdminHandler đang kết nối */
+    public void broadcastAdminEvent(String event) {
+        for (AdminHandler ah : new ArrayList<>(adminHandlers)) {
+            ah.sendEvent(event);
+        }
+    }
+
+    /** Gửi full state snapshot tới một AdminHandler */
+    public void sendAdminSnapshot(AdminHandler ah) {
+        StringBuilder sb = new StringBuilder("SNAPSHOT");
+        sb.append("|ONLINE:");
+        for (String u : snapshotOnline()) sb.append(u).append(",");
+        sb.append("|WAITING:");
+        for (String u : snapshotWaiting()) sb.append(u).append(",");
+        sb.append("|ROOMS:");
+        for (String r : snapshotRoomNames()) {
+            sb.append(r).append("=");
+            for (String u : snapshotUsersInRoom(r)) sb.append(u).append(";");
+            sb.append(",");
+        }
+        ah.sendEvent(sb.toString());
     }
 
     public List<String> snapshotOnline() {
@@ -264,7 +349,4 @@ public final class Server {
         return list;
     }
 
-    void pushUi() {
-        if (ui != null) ui.refreshListsFromServer();
-    }
 }

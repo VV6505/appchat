@@ -1,77 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- You may freely edit this file. See commented blocks below for -->
-<!-- some examples of how to customize the build. -->
-<!-- (If you delete it and reopen the project it will be recreated.) -->
-<!-- By default, only the Clean and Build commands use this build script. -->
-<!-- Commands such as Run, Debug, and Test only use this build script if -->
-<!-- the Compile on Save feature is turned off for the project. -->
-<!-- You can turn off the Compile on Save (or Deploy on Save) setting -->
-<!-- in the project's Project Properties dialog box.-->
 <project name="ChatMulti" default="default" basedir=".">
     <description>Builds, tests, and runs the project ChatMulti.</description>
     <import file="nbproject/build-impl.xml"/>
-    <!--
 
-    There exist several targets which are by default empty and which can be 
-    used for execution of your tasks. These targets are usually executed 
-    before and after some main targets. They are: 
-
-      -pre-init:                 called before initialization of project properties
-      -post-init:                called after initialization of project properties
-      -pre-compile:              called before javac compilation
-      -post-compile:             called after javac compilation
-      -pre-compile-single:       called before javac compilation of single file
-      -post-compile-single:      called after javac compilation of single file
-      -pre-compile-test:         called before javac compilation of JUnit tests
-      -post-compile-test:        called after javac compilation of JUnit tests
-      -pre-compile-test-single:  called before javac compilation of single JUnit test
-      -post-compile-test-single: called after javac compilation of single JUunit test
-      -pre-jar:                  called before JAR building
-      -post-jar:                 called after JAR building
-      -post-clean:               called after cleaning build products
-
-    (Targets beginning with '-' are not intended to be called on their own.)
-
-    Example of inserting an obfuscator after compilation could look like this:
-
-        <target name="-post-compile">
-            <obfuscate>
-                <fileset dir="${build.classes.dir}"/>
-            </obfuscate>
-        </target>
-
-    For list of available properties check the imported 
-    nbproject/build-impl.xml file. 
-
-
-    Another way to customize the build is by overriding existing main targets.
-    The targets of interest are: 
-
-      -init-macrodef-javac:     defines macro for javac compilation
-      -init-macrodef-junit:     defines macro for junit execution
-      -init-macrodef-debug:     defines macro for class debugging
-      -init-macrodef-java:      defines macro for class execution
-      -do-jar:                  JAR building
-      run:                      execution of project 
-      -javadoc-build:           Javadoc generation
-      test-report:              JUnit report generation
-
-    An example of overriding the target for project execution could look like this:
-
-        <target name="run" depends="ChatMulti-impl.jar">
-            <exec dir="bin" executable="launcher.exe">
-                <arg file="${dist.jar}"/>
-            </exec>
-        </target>
-
-    Notice that the overridden target depends on the jar target and not only on 
-    the compile target as the regular run target does. Again, for a list of available 
-    properties which you can use, check the target you are overriding in the
-    nbproject/build-impl.xml file. 
-
-    -->
-
-    <!-- Ghi đè clean NetBeans: tránh BUILD FAILED khi dist/ChatMulti.jar đang bị khóa (Java/IDE đang giữ file). -->
+    <!-- Ghi đè clean: tránh BUILD FAILED khi JAR đang bị khóa. -->
     <target name="-do-clean">
         <delete dir="${build.dir}" failonerror="false"/>
         <delete dir="${dist.jlink.output}" failonerror="false"/>
@@ -79,55 +11,33 @@
         <delete dir="${dist.dir}" failonerror="false"/>
     </target>
 
-    <!-- Trước khi đóng gói JAR: thử xóa file cũ; nếu vẫn khóa thì bước jar có thể lỗi — cần tắt app đang chạy từ JAR. -->
+    <!-- Xóa JAR cũ trước khi build. -->
     <target name="-pre-jar">
         <delete file="${dist.jar}" quiet="true" failonerror="false"/>
     </target>
 
-    <!-- Sau ChatMulti.jar: thêm server.jar (Swing) và server-headless.jar (Linux/Azure). -->
+    <!--
+        Sau khi build ChatMulti.jar (client), tự động build thêm server.jar.
+        Kết quả cuối: dist/ChatMulti.jar (client) + dist/server.jar (server Azure).
+    -->
     <target name="-post-jar">
         <antcall target="server-jar"/>
-        <antcall target="server-headless-jar"/>
     </target>
 
-    <!-- server.jar — GUI ServerUI (Windows / máy có desktop). -->
-    <target name="server-jar" depends="compile" description="Gói dist/server.jar (Main chatmulti.ui.ServerUI).">
+    <!-- server.jar: deploy lên Azure/Linux -->
+    <target name="server-jar" depends="compile" description="Tạo dist/server.jar để deploy server.">
         <mkdir dir="${dist.dir}"/>
         <property name="dist.server.jar" location="${dist.dir}/server.jar"/>
         <delete file="${dist.server.jar}" quiet="true" failonerror="false"/>
         <jar jarfile="${dist.server.jar}" basedir="${build.classes.dir}" manifestencoding="UTF-8">
             <manifest>
-                <attribute name="Main-Class" value="chatmulti.ui.ServerUI"/>
+                <attribute name="Main-Class" value="chatmulti.Server"/>
             </manifest>
         </jar>
-        <echo message="Server JAR (GUI): ${dist.server.jar}"/>
+        <echo message="=================================="/>
+        <echo message=" Server JAR: ${dist.server.jar}"/>
+        <echo message=" Client JAR: ${dist.jar}"/>
+        <echo message="=================================="/>
     </target>
 
-    <!-- server-headless.jar — không Swing, chạy trên Linux/Azure (java -jar hoặc systemd). -->
-    <target name="server-headless-jar" depends="compile" description="Gói dist/server-headless.jar (Main chatmulti.ServerHeadless).">
-        <mkdir dir="${dist.dir}"/>
-        <property name="dist.server.headless.jar" location="${dist.dir}/server-headless.jar"/>
-        <delete file="${dist.server.headless.jar}" quiet="true" failonerror="false"/>
-        <jar jarfile="${dist.server.headless.jar}" basedir="${build.classes.dir}" manifestencoding="UTF-8">
-            <manifest>
-                <attribute name="Main-Class" value="chatmulti.ServerHeadless"/>
-            </manifest>
-        </jar>
-        <echo message="Server JAR (headless): ${dist.server.headless.jar}"/>
-    </target>
-
-    <target name="jars" depends="server-jar,server-headless-jar,client-jar">
-        <echo message="Built: ${dist.server.jar}, ${dist.server.headless.jar}, ${dist.client.jar}"/>
-    </target>
-
-    <target name="client-jar" depends="compile" description="Gói dist/client.jar (Main chatmulti.ui.Client).">
-        <mkdir dir="${dist.dir}"/>
-        <property name="dist.client.jar" location="${dist.dir}/client.jar"/>
-        <delete file="${dist.client.jar}" quiet="true" failonerror="false"/>
-        <jar jarfile="${dist.client.jar}" basedir="${build.classes.dir}" manifestencoding="UTF-8">
-            <manifest>
-                <attribute name="Main-Class" value="chatmulti.ui.Client"/>
-            </manifest>
-        </jar>
-    </target>
 </project>
