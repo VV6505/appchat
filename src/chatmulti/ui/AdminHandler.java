@@ -4,26 +4,6 @@ import chatmulti.Server;
 import java.io.*;
 import java.net.Socket;
 
-/**
- * Xử lý kết nối TCP của admin client.
- * Giao thức:
- *   Client → Server (lệnh):
- *     ADMIN_CMD|CREATE_ROOM|<room>
- *     ADMIN_CMD|DELETE_ROOM|<room>
- *     ADMIN_CMD|ADD_USER|<user>|<room>
- *     ADMIN_CMD|KICK_USER|<user>
- *     ADMIN_CMD|REQUEST_SNAPSHOT
- *
- *   Server → Client (push events):
- *     SNAPSHOT|ONLINE:u1,u2,...|WAITING:u3,...|ROOMS:r1=u1;u2;,r2=u3;,...
- *     USER_CONNECTED|<user>
- *     USER_DISCONNECTED|<user>
- *     USER_ROOM_CHANGED|<user>|<from>|<to>
- *     ROOM_CREATED|<room>
- *     ROOM_DELETED|<room>
- *     ADMIN_ACK|<msg>
- *     ADMIN_ERR|<msg>
- */
 public final class AdminHandler {
     private final Socket socket;
     private final DataInputStream in;

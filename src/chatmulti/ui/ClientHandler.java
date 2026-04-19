@@ -15,7 +15,6 @@ public final class ClientHandler implements Runnable {
     private String username;
     private volatile boolean closed;
 
-    /** Constructor mới: nhận DataInputStream/DataOutputStream đã tạo + dòng đầu đã đọc */
     public ClientHandler(Socket socket, Server server, String firstLine,
                          DataInputStream in, DataOutputStream out) {
         this.socket = socket;
@@ -23,15 +22,6 @@ public final class ClientHandler implements Runnable {
         this.firstLine = firstLine;
         this.in = in;
         this.out = out;
-    }
-
-    /** Constructor cũ (dùng cho ServerUI local nếu cần) */
-    public ClientHandler(Socket socket, Server server) {
-        this.socket = socket;
-        this.server = server;
-        this.firstLine = null;
-        this.in = null;
-        this.out = null;
     }
 
     @Override
@@ -56,7 +46,7 @@ public final class ClientHandler implements Runnable {
             }
             String name = first.substring(PREFIX_CONNECT.length()).trim();
             if (name.isEmpty() || name.contains("|")) {
-                sendRaw(dataOut, "ERROR|Invalid username");
+                sendRaw(dataOut, "ERROR|Vui lòng nhập tên!");
                 return;
             }
             // Không cho dùng tên admin
@@ -65,15 +55,13 @@ public final class ClientHandler implements Runnable {
                 return;
             }
             if (server.isUsernameOnline(name)) {
-                sendRaw(dataOut, "ERROR|Duplicate username");
+                sendRaw(dataOut, "ERROR|Người dùng này đã có trong hệ thống");
                 return;
             }
             this.username = name;
 
             // Gán out trước khi gọi onClientReady để sendUtf hoạt động
-            synchronized (this) {
-                // Assign internal out field via reflection-free approach: dùng local variable
-            }
+            synchronized (this) {}
 
             // Lưu dataOut để sendUtf dùng
             this.cachedOut = dataOut;

@@ -73,18 +73,8 @@ public final class UiTheme {
 
     // ── Fonts ──────────────────────────────────────────────────────────────────
     public static Font uiFont(int style, int size) {
+        // Thử load Nunito (nếu có), fallback sang SansSerif đẹp
         return new Font("Segoe UI", style, size);
-    }
-
-    /** Font render emoji trên Windows (Segoe UI Emoji), fallback SansSerif */
-    public static Font emojiFont(int size) {
-        // Segoe UI Emoji có sẵn trên Windows 10/11, hỗ trợ đầy đủ Unicode emoji
-        Font f = new Font("Segoe UI Emoji", Font.PLAIN, size);
-        if (f.getFamily().equals("Dialog")) {
-            // Fallback: thử Noto Emoji hoặc SansSerif
-            f = new Font("SansSerif", Font.PLAIN, size);
-        }
-        return f;
     }
 
     // ── Rounded border tùy chỉnh ───────────────────────────────────────────────
@@ -281,7 +271,7 @@ public final class UiTheme {
                 super.paint(g, c);
             }
         });
-        b.setFont(emojiFont(20));   // Segoe UI Emoji
+        b.setFont(uiFont(Font.PLAIN, 20));
         b.setForeground(MUTED);
         b.setFocusPainted(false);
         b.setOpaque(false);
@@ -310,7 +300,7 @@ public final class UiTheme {
                 super.paint(g, c);
             }
         });
-        b.setFont(emojiFont(16));   // Segoe UI Emoji
+        b.setFont(uiFont(Font.PLAIN, 15));
         b.setForeground(MUTED);
         b.setFocusPainted(false);
         b.setOpaque(false);
@@ -340,8 +330,8 @@ public final class UiTheme {
                 super.paint(g, c);
             }
         });
-        b.setFont(emojiFont(20));   // dùng Segoe UI Emoji để render icon đúng
-        b.setForeground(active ? new Color(0xA5A7FF) : new Color(0xAAACCC));
+        b.setFont(uiFont(Font.PLAIN, 20));
+        b.setForeground(active ? new Color(0xA5A7FF) : new Color(0x888BAA));
         b.setFocusPainted(false);
         b.setOpaque(false);
         b.setContentAreaFilled(false);

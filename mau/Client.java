@@ -139,35 +139,42 @@ public final class Client extends JFrame {
         sb.setPreferredSize(new Dimension(64, 0));
         sb.setOpaque(false);
 
-        // Không có nav buttons (icon không hiển thị được)
-        sb.add(Box.createVerticalGlue());
-
-        // Nút Admin (chỉ hiện khi là admin) — dùng text thuần
-        JButton gearBtn = new JButton("ADM") {
+        // Logo
+        sb.add(Box.createRigidArea(new Dimension(0, 14)));
+        JLabel logo = new JLabel("💬", SwingConstants.CENTER) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                if (getModel().isRollover()) {
-                    g2.setColor(new Color(0x1E1B5E));
-                    g2.fill(new java.awt.geom.RoundRectangle2D.Float(0, 0, getWidth(), getHeight(), 10, 10));
-                }
+                g2.setColor(UiTheme.PRIMARY);
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 12, 12);
                 g2.dispose();
                 super.paintComponent(g);
             }
         };
-        gearBtn.setFont(UiTheme.uiFont(Font.BOLD, 10));
-        gearBtn.setForeground(new Color(0xAAACCC));
-        gearBtn.setFocusPainted(false); gearBtn.setOpaque(false);
-        gearBtn.setContentAreaFilled(false); gearBtn.setBorderPainted(false);
-        gearBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        gearBtn.setPreferredSize(new Dimension(44, 32));
-        gearBtn.setMaximumSize(new Dimension(44, 32));
-        gearBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
-        gearBtn.addActionListener(e -> { if (isAdmin) cardLayout.show(contentArea, SCREEN_ADMIN); });
-        sb.add(gearBtn);
-        sb.add(Box.createRigidArea(new Dimension(0, 8)));
+        logo.setPreferredSize(new Dimension(40, 40));
+        logo.setMaximumSize(new Dimension(40, 40));
+        logo.setFont(UiTheme.uiFont(Font.PLAIN, 22));
+        logo.setAlignmentX(Component.CENTER_ALIGNMENT);
+        logo.setOpaque(false);
+        sb.add(logo);
+        sb.add(Box.createRigidArea(new Dimension(0, 14)));
 
-        // Avatar — vẽ bằng Graphics2D, luôn hiển thị đúng
+        sb.add(makeSidebarBtn("💬", true,  null));
+        sb.add(Box.createRigidArea(new Dimension(0, 4)));
+        sb.add(makeSidebarBtn("👥", false, null));
+        sb.add(Box.createRigidArea(new Dimension(0, 4)));
+        sb.add(makeSidebarBtn("📁", false, null));
+
+        sb.add(Box.createVerticalGlue());
+
+        // Admin gear
+        JButton gearBtn = makeSidebarBtn("⚙️", false, () -> {
+            if (isAdmin) cardLayout.show(contentArea, SCREEN_ADMIN);
+        });
+        sb.add(gearBtn);
+        sb.add(Box.createRigidArea(new Dimension(0, 10)));
+
+        // Avatar me
         JLabel avatarMe = new JLabel("?", SwingConstants.CENTER) {
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
@@ -218,7 +225,7 @@ public final class Client extends JFrame {
 
         // Logo + title
         g.gridx = 0; g.gridy = 0; g.gridwidth = 1;
-        JLabel logo = new JLabel("◉", SwingConstants.CENTER) {
+        JLabel logo = new JLabel("💬", SwingConstants.CENTER) {
             @Override protected void paintComponent(Graphics gr) {
                 Graphics2D g2 = (Graphics2D) gr.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -539,12 +546,18 @@ public final class Client extends JFrame {
         left.add(info, BorderLayout.CENTER);
         hdr.add(left, BorderLayout.WEST);
 
-        // Chỉ giữ nút "Rời phòng" — bỏ các nút icon không hiển thị
+        // Action buttons
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
         actions.setOpaque(false);
+        JButton btnSearch = new JButton("🔍");
+        JButton btnMore   = new JButton("⋯");
+        UiTheme.styleChatHeaderButton(btnSearch);
+        UiTheme.styleChatHeaderButton(btnMore);
         JButton btnLeave = new JButton("Rời phòng");
         UiTheme.styleSecondaryButton(btnLeave);
         btnLeave.addActionListener(e -> disconnectToLogin());
+        actions.add(btnSearch);
+        actions.add(btnMore);
         actions.add(btnLeave);
         hdr.add(actions, BorderLayout.EAST);
 
@@ -552,13 +565,30 @@ public final class Client extends JFrame {
     }
 
     private JPanel buildInputBar() {
-        JPanel bar = new JPanel(new BorderLayout(8, 0));
+        JPanel bar = new JPanel(new BorderLayout(10, 0));
         bar.setBackground(UiTheme.SURFACE);
         bar.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createMatteBorder(1, 0, 0, 0, UiTheme.BORDER),
                 new EmptyBorder(10, 14, 10, 14)));
 
-        // Input field bo tròn (chiếm tối đa không gian)
+        // Mini buttons bên trái
+        JPanel leftBtns = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
+        leftBtns.setOpaque(false);
+        JButton btnEmoji = new JButton("😀");
+        JButton btnSticker = new JButton("🏷️");
+        JButton btnFile = new JButton("📎");
+        UiTheme.styleChatMiniButton(btnEmoji);
+        UiTheme.styleChatMiniButton(btnSticker);
+        UiTheme.styleChatMiniButton(btnFile);
+        btnEmoji.addActionListener(e -> showEmojiPopup(btnEmoji));
+        btnSticker.addActionListener(e -> showStickerPicker());
+        btnFile.addActionListener(e -> pickAndSendFile());
+        leftBtns.add(btnEmoji);
+        leftBtns.add(btnSticker);
+        leftBtns.add(btnFile);
+        bar.add(leftBtns, BorderLayout.WEST);
+
+        // Input field bo tròn
         tfMsg.setFont(UiTheme.uiFont(Font.PLAIN, 14));
         tfMsg.setBackground(UiTheme.BG);
         tfMsg.setForeground(UiTheme.TEXT);
@@ -570,72 +600,16 @@ public final class Client extends JFrame {
         tfMsg.addActionListener(e -> sendTextUdp());
         bar.add(tfMsg, BorderLayout.CENTER);
 
-        // Bên phải: [☺ Emoji] [Tệp ▾ → dropdown] [Gửi]
-        JPanel rightBtns = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
-        rightBtns.setOpaque(false);
-
-        // Nút emoji
-        JButton btnEmoji = makeTextToolBtn("☺ Emoji");
-        btnEmoji.addActionListener(e -> showEmojiPopup(btnEmoji));
-
-        // Nút "Tệp ▾" — sổ popup chọn: Nhãn dán / Đính kèm tệp
-        JButton btnAttach = makeTextToolBtn("Tệp  v");
-        JPopupMenu attachMenu = new JPopupMenu();
-        attachMenu.setBackground(UiTheme.SURFACE);
-
-        JMenuItem miSticker = new JMenuItem("Nhãn dán");
-        miSticker.setFont(UiTheme.uiFont(Font.PLAIN, 13));
-        miSticker.setForeground(UiTheme.TEXT);
-        miSticker.addActionListener(ev -> showStickerPicker());
-
-        JMenuItem miFile = new JMenuItem("Đính kèm tệp");
-        miFile.setFont(UiTheme.uiFont(Font.PLAIN, 13));
-        miFile.setForeground(UiTheme.TEXT);
-        miFile.addActionListener(ev -> pickAndSendFile());
-
-        attachMenu.add(miSticker);
-        attachMenu.addSeparator();
-        attachMenu.add(miFile);
-
-        btnAttach.addActionListener(e ->
-                attachMenu.show(btnAttach, 0, -attachMenu.getPreferredSize().height));
-
-        // Nút Gửi (text)
-        JButton btnSend = new JButton("Gửi");
-        UiTheme.stylePrimaryButton(btnSend);
-        btnSend.addActionListener(e -> sendTextUdp());
-
-        rightBtns.add(btnEmoji);
-        rightBtns.add(btnAttach);
-        rightBtns.add(btnSend);
-        bar.add(rightBtns, BorderLayout.EAST);
+        // Send button tròn
+        JButton send = new JButton("➤");
+        UiTheme.styleSendButton(send);
+        send.addActionListener(e -> sendTextUdp());
+        JPanel rightWrap = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+        rightWrap.setOpaque(false);
+        rightWrap.add(send);
+        bar.add(rightWrap, BorderLayout.EAST);
 
         return bar;
-    }
-
-    /** Nút tool nhỏ trong input bar dùng text thuần, không phụ thuộc emoji */
-    private JButton makeTextToolBtn(String label) {
-        JButton b = new JButton(label);
-        b.setFont(UiTheme.uiFont(Font.PLAIN, 12));
-        b.setForeground(UiTheme.MUTED);
-        b.setFocusPainted(false);
-        b.setOpaque(false);
-        b.setContentAreaFilled(false);
-        b.setBorderPainted(false);
-        b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        b.setBorder(BorderFactory.createCompoundBorder(
-                new UiTheme.RoundedBorder(8, UiTheme.BORDER, 1),
-                BorderFactory.createEmptyBorder(5, 10, 5, 10)));
-        // Hover
-        b.addMouseListener(new java.awt.event.MouseAdapter() {
-            @Override public void mouseEntered(java.awt.event.MouseEvent e) {
-                b.setForeground(UiTheme.PRIMARY); b.repaint();
-            }
-            @Override public void mouseExited(java.awt.event.MouseEvent e) {
-                b.setForeground(UiTheme.MUTED); b.repaint();
-            }
-        });
-        return b;
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -649,7 +623,7 @@ public final class Client extends JFrame {
         JPanel titleBar = new JPanel(new BorderLayout());
         titleBar.setBackground(UiTheme.SIDEBAR_BG);
         titleBar.setBorder(new EmptyBorder(13, 20, 13, 20));
-        JLabel lbTitle = new JLabel("⚙  Quản trị — ChatApp");
+        JLabel lbTitle = new JLabel("⚙️  Bảng quản trị — ChatApp");
         lbTitle.setFont(UiTheme.uiFont(Font.BOLD, 15));
         lbTitle.setForeground(Color.WHITE);
         titleBar.add(lbTitle, BorderLayout.WEST);
@@ -678,9 +652,9 @@ public final class Client extends JFrame {
         leftPanel.setBackground(UiTheme.ROOMS_BG);
         leftPanel.setBorder(BorderFactory.createMatteBorder(0, 0, 0, 1, UiTheme.BORDER));
 
-        leftPanel.add(buildAdminListCard("● Users online", adminOnlineModel, UiTheme.ONLINE));
-        leftPanel.add(buildAdminListCard("○ Chờ phòng", adminWaitingModel, UiTheme.WAITING_COLOR));
-        leftPanel.add(buildAdminListCard("▣ Danh sách phòng", adminRoomsModel, UiTheme.PRIMARY));
+        leftPanel.add(buildAdminListCard("👤 User online", adminOnlineModel, UiTheme.ONLINE));
+        leftPanel.add(buildAdminListCard("⏳ Đang chờ", adminWaitingModel, UiTheme.WAITING_COLOR));
+        leftPanel.add(buildAdminListCard("💬 Danh sách phòng", adminRoomsModel, UiTheme.PRIMARY));
         body.add(leftPanel, BorderLayout.WEST);
 
         // RIGHT: controls + log
@@ -772,7 +746,7 @@ public final class Client extends JFrame {
 
         row++;
         g.gridx = 0; g.gridy = row; g.gridwidth = 4; g.anchor = GridBagConstraints.EAST;
-        JButton btnRefresh = new JButton("↺  Làm mới");
+        JButton btnRefresh = new JButton("🔄  Làm mới");
         UiTheme.styleSecondaryButton(btnRefresh);
         btnRefresh.addActionListener(e -> adminSendCmd("REQUEST_SNAPSHOT"));
         ctrlCard.add(btnRefresh, g);
@@ -880,17 +854,11 @@ public final class Client extends JFrame {
     //  CONNECT LOGIC
     // ═══════════════════════════════════════════════════════════════════════════
     private void doConnect(boolean isQuick) {
-        String adminPass = new String(tfAdminPass.getPassword()).trim();
-        boolean tryAdmin = !adminPass.isEmpty();
-
         String u = fieldText(tfUser, "Nhập username...");
-        // Nếu là admin thì không cần username; nếu là user thường thì validate
-        if (!tryAdmin && (u.isEmpty() || u.contains("|"))) {
+        if (u.isEmpty() || u.contains("|")) {
             JOptionPane.showMessageDialog(this, "Username không hợp lệ.", "Lỗi", JOptionPane.WARNING_MESSAGE);
             return;
         }
-        if (tryAdmin && u.isEmpty()) u = "admin"; // placeholder, không gửi lên server
-
         final String host;
         final int tcpPort, udpPort;
         if (isQuick) {
@@ -908,6 +876,8 @@ public final class Client extends JFrame {
                 return;
             }
         }
+        String adminPass = new String(tfAdminPass.getPassword()).trim();
+        boolean tryAdmin = !adminPass.isEmpty();
 
         stopNetworking();
         username   = u;
@@ -937,13 +907,13 @@ public final class Client extends JFrame {
                     SwingUtilities.invokeLater(() -> {
                         setTitle("ChatApp — [ADMIN]");
                         cardLayout.show(contentArea, SCREEN_ADMIN);
-                        adminAppendLog("[OK] Đã kết nối admin vào " + host + ":" + tcpPort);
+                        adminAppendLog("✅ Đã kết nối admin vào " + host + ":" + tcpPort);
                     });
                     adminReaderThread = new Thread(this::adminReadLoop, "chatmulti-admin-reader");
                     adminReaderThread.setDaemon(true);
                     adminReaderThread.start();
                 } else {
-                    out.writeUTF("CONNECT|" + username);
+                    out.writeUTF("CONNECT|" + u);
                     out.flush();
                     String line = in.readUTF().trim();
                     if (line.startsWith("ERROR|")) {
@@ -955,14 +925,14 @@ public final class Client extends JFrame {
                         return;
                     }
                     DatagramSocket ds = new DatagramSocket();
-                    byte[] reg = ("REGISTER|" + username).getBytes(StandardCharsets.UTF_8);
+                    byte[] reg = ("REGISTER|" + u).getBytes(StandardCharsets.UTF_8);
                     ds.send(new DatagramPacket(reg, reg.length, InetAddress.getByName(host), udpPort));
 
                     tcpSocket = s; tcpIn = in; tcpOut = out;
                     udpSocket = ds; isAdmin = false;
 
                     SwingUtilities.invokeLater(() -> {
-                        setTitle("ChatApp — " + username);
+                        setTitle("ChatApp — " + u);
                         showWaitUi();
                     });
                     tcpReaderThread = new Thread(this::tcpReadLoop, "chatmulti-client-tcp");
@@ -1043,13 +1013,13 @@ public final class Client extends JFrame {
 
     private void processAdminEvent(String event) {
         if      (event.startsWith("SNAPSHOT|"))         parseAndApplySnapshot(event);
-        else if (event.startsWith("USER_CONNECTED|"))   SwingUtilities.invokeLater(() -> adminAppendLog("[+] Kết nối: " + event.substring(15)));
-        else if (event.startsWith("USER_DISCONNECTED|"))SwingUtilities.invokeLater(() -> adminAppendLog("[-] Rời: " + event.substring(17)));
-        else if (event.startsWith("USER_ROOM_CHANGED|"))SwingUtilities.invokeLater(() -> adminAppendLog("[↔] " + event.substring(17).replace("|", " → ")));
-        else if (event.startsWith("ROOM_CREATED|"))     SwingUtilities.invokeLater(() -> adminAppendLog("[+] Phòng mới: " + event.substring(13)));
-        else if (event.startsWith("ROOM_DELETED|"))     SwingUtilities.invokeLater(() -> adminAppendLog("[x] Xóa phòng: " + event.substring(13)));
-        else if (event.startsWith("ADMIN_ACK|"))        SwingUtilities.invokeLater(() -> adminAppendLog("[OK] " + event.substring(10)));
-        else if (event.startsWith("ADMIN_ERR|"))        SwingUtilities.invokeLater(() -> adminAppendLog("[ERR] " + event.substring(10)));
+        else if (event.startsWith("USER_CONNECTED|"))   SwingUtilities.invokeLater(() -> adminAppendLog("🔵 Kết nối: " + event.substring(15)));
+        else if (event.startsWith("USER_DISCONNECTED|"))SwingUtilities.invokeLater(() -> adminAppendLog("⚫ Rời: " + event.substring(17)));
+        else if (event.startsWith("USER_ROOM_CHANGED|"))SwingUtilities.invokeLater(() -> adminAppendLog("↔ " + event.substring(17).replace("|", " → ")));
+        else if (event.startsWith("ROOM_CREATED|"))     SwingUtilities.invokeLater(() -> adminAppendLog("➕ Phòng mới: " + event.substring(13)));
+        else if (event.startsWith("ROOM_DELETED|"))     SwingUtilities.invokeLater(() -> adminAppendLog("🗑 Xóa phòng: " + event.substring(13)));
+        else if (event.startsWith("ADMIN_ACK|"))        SwingUtilities.invokeLater(() -> adminAppendLog("✅ " + event.substring(10)));
+        else if (event.startsWith("ADMIN_ERR|"))        SwingUtilities.invokeLater(() -> adminAppendLog("❌ " + event.substring(10)));
         if (!event.startsWith("ADMIN_ACK") && !event.startsWith("ADMIN_ERR"))
             adminSendCmd("REQUEST_SNAPSHOT");
     }
@@ -1311,7 +1281,7 @@ public final class Client extends JFrame {
                 Image scaled = bi.getScaledInstance(Math.max(1,(int)(w*sc)), Math.max(1,(int)(h*sc)), Image.SCALE_SMOOTH);
                 box.add(new JLabel(new ImageIcon(scaled)), BorderLayout.CENTER);
             } else {
-                JLabel inf = new JLabel("[file] " + fileName);
+                JLabel inf = new JLabel("📎 " + fileName);
                 inf.setForeground(isMe ? UiTheme.BUBBLE_ME_TEXT : UiTheme.BUBBLE_OTHER_TEXT);
                 box.add(inf, BorderLayout.CENTER);
             }
@@ -1435,7 +1405,7 @@ public final class Client extends JFrame {
     // ═══════════════════════════════════════════════════════════════════════════
     public static void main(String[] args) {
         System.setProperty("java.net.preferIPv4Stack", "true");
-        System.out.println("ChatApp Client v2.0");
+        System.out.println("ChatApp Client v3.0 — Zalo-style UI");
         try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); }
         catch (Exception ignored) {}
         SwingUtilities.invokeLater(() -> new Client().setVisible(true));
