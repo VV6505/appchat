@@ -84,7 +84,9 @@ public final class ClientHandler implements Runnable {
                     }
                     byte[] buf = new byte[(int) sz];
                     dataIn.readFully(buf);
-                    server.handleTcpFileUpload(username, fn, buf);
+                    server.handleTcpFileUpload(username, fn, buf, dataIn.readUTF()); // Thêm targetRoom
+                } else if ("GET_MY_ROOMS".equals(cmd)) {
+                    server.onClientReconnect(username);
                 }
             }
         } catch (EOFException ignored) {
@@ -115,7 +117,7 @@ public final class ClientHandler implements Runnable {
         }
     }
 
-    public void sendFileRecv(String fromUser, String fileName, byte[] data) {
+    public void sendFileRecv(String fromUser, String fileName, byte[] data, String roomName) {
         DataOutputStream d = cachedOut;
         if (d == null || closed || data == null) return;
         synchronized (this) {
@@ -126,6 +128,7 @@ public final class ClientHandler implements Runnable {
                 d.writeUTF(fileName);
                 d.writeInt(data.length);
                 d.write(data);
+                d.writeUTF(roomName); // Thêm roomName vào protocol
                 d.flush();
             } catch (IOException ignored) {}
         }

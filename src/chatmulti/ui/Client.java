@@ -56,6 +56,8 @@ public final class Client extends JFrame {
     private final JTextField tfMsg = new JTextField();
     private final JLabel lblRoomHeader = new JLabel("Phòng: —");
     private final JLabel lblOnlineCount = new JLabel("Đang online");
+    private JLabel lblChatAvatar;
+    private JPanel roomListPanel;
 
     // ── Admin screen ───────────────────────────────────────────────────────────
     private final DefaultListModel<String> adminOnlineModel = new DefaultListModel<>();
@@ -561,8 +563,8 @@ public final class Client extends JFrame {
 
         JPanel left = new JPanel(new BorderLayout(10, 0));
         left.setOpaque(false);
-        JLabel avLbl = UiTheme.makeAvatar("?", UiTheme.PRIMARY, 40);
-        left.add(avLbl, BorderLayout.WEST);
+        lblChatAvatar = UiTheme.makeAvatar("?", UiTheme.PRIMARY, 40);
+        left.add(lblChatAvatar, BorderLayout.WEST);
 
         JPanel info = new JPanel(new BorderLayout(0, 2));
         info.setOpaque(false);
@@ -595,7 +597,9 @@ public final class Client extends JFrame {
                 new EmptyBorder(10, 14, 10, 14)));
 
         // Input field bo tròn (chiếm tối đa không gian)
-        tfMsg.setFont(UiTheme.uiFont(Font.PLAIN, 14));
+        // Dùng font Segoe UI làm font chính, nó sẽ tự động fallback sang Segoe UI Emoji 
+        // cho các ký tự emoji trên Windows 10/11 mà không làm hỏng font chữ thường.
+        tfMsg.setFont(UiTheme.uiFont(Font.PLAIN, 14)); 
         tfMsg.setBackground(UiTheme.BG);
         tfMsg.setForeground(UiTheme.TEXT);
         tfMsg.setBorder(BorderFactory.createCompoundBorder(
@@ -824,14 +828,40 @@ public final class Client extends JFrame {
         ctrlCard.add(cbAdminInRoom, g);
         g.gridx = 2;
         g.fill = GridBagConstraints.NONE;
-        JButton btnKick = new JButton("Kick về waiting");
+        JButton btnKick = new JButton("Kick khỏi phòng");
         UiTheme.styleSecondaryButton(btnKick);
         btnKick.addActionListener(e -> {
             Object u = cbAdminInRoom.getSelectedItem();
-            if (u != null && !u.toString().isBlank())
-                adminSendCmd("KICK_USER|" + u.toString().trim());
+            Object r = cbAdminRooms.getSelectedItem(); // Lấy phòng đang chọn để kick
+            if (u != null && r != null)
+                adminSendCmd("KICK_USER|" + u.toString().trim() + "|" + r.toString().trim());
         });
         ctrlCard.add(btnKick, g);
+
+        row++;
+        g.gridx = 0;
+        g.gridy = row;
+        g.gridwidth = 1;
+        ctrlCard.add(adminLabel("Quản lý bộ nhớ"), g);
+        g.gridx = 1;
+        g.gridwidth = 2;
+        g.fill = GridBagConstraints.HORIZONTAL;
+        JButton btnPurge = new JButton("Xóa dữ liệu (Clear Session)");
+        UiTheme.styleSecondaryButton(btnPurge);
+        btnPurge.setForeground(new Color(0xEF4444)); // Màu đỏ cảnh báo
+        btnPurge.addActionListener(e -> {
+            String u = JOptionPane.showInputDialog(this, "Nhập tên User muốn xóa sạch dữ liệu:");
+            if (u != null && !u.trim().isEmpty()) {
+                int ok = JOptionPane.showConfirmDialog(this, 
+                    "Xác nhận xóa sạch dữ liệu của \"" + u + "\"?\n(Người này sẽ bị mất hết phòng đã tham gia)", 
+                    "Cảnh báo", JOptionPane.YES_NO_OPTION);
+                if (ok == JOptionPane.YES_OPTION) {
+                    adminSendCmd("DELETE_USER_DATA|" + u.trim());
+                }
+            }
+        });
+        ctrlCard.add(btnPurge, g);
+        g.gridwidth = 1;
 
         row++;
         g.gridx = 0;
@@ -1023,14 +1053,23 @@ public final class Client extends JFrame {
                     if (line.startsWith("ERROR|")) {
                         s.close();
                         String err = line.length() > 6 ? line.substring(6) : "Lỗi";
+                        // Theo yêu cầu: thông báo lỗi trùng tên nếu Admin chưa giữ thông tin
+                        if (err.contains("đã có trong hệ thống")) {
+                            err = "Tên đã tồn tại hoặc Admin chưa chấp nhận giữ thông tin.";
+                        }
+                        final String finalErr = err;
                         SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(
-                                this, err, "Không kết nối được", JOptionPane.ERROR_MESSAGE));
+                                this, finalErr, "Không kết nối được", JOptionPane.ERROR_MESSAGE));
                         stopNetworking();
                         return;
                     }
                     DatagramSocket ds = new DatagramSocket();
                     byte[] reg = ("REGISTER|" + username).getBytes(StandardCharsets.UTF_8);
                     ds.send(new DatagramPacket(reg, reg.length, InetAddress.getByName(host), udpPort));
+                    
+                    // Gửi lệnh khôi phục session (lấy danh sách phòng cũ)
+                    out.writeUTF("GET_MY_ROOMS");
+                    out.flush();
 
                     tcpSocket = s;
                     tcpIn = in;
@@ -1067,10 +1106,14 @@ public final class Client extends JFrame {
                 return;
             while (!closing) {
                 String line = in.readUTF().trim();
-                if (line.startsWith("JOINED_ROOM|")) {
-                    String room = line.substring("JOINED_ROOM|".length()).trim();
-                    currentRoom = room;
-                    SwingUtilities.invokeLater(() -> switchToChat(room));
+                if (line.startsWith("ROOM_LIST|")) {
+                    String list = line.substring("ROOM_LIST|".length());
+                    java.util.List<String> rList = list.isEmpty() ? new java.util.ArrayList<>() 
+                            : java.util.Arrays.asList(list.split(","));
+                    SwingUtilities.invokeLater(() -> updateSidebarRoomList(rList));
+                } else if (line.startsWith("JOINED_ROOM|")) {
+                    currentRoom = line.substring("JOINED_ROOM|".length());
+                    SwingUtilities.invokeLater(() -> switchToChat(currentRoom));
                 } else if ("BACK_TO_WAITING".equals(line)) {
                     currentRoom = null;
                     SwingUtilities.invokeLater(this::backToWaitingUi);
@@ -1517,6 +1560,12 @@ public final class Client extends JFrame {
         }
         lblRoomHeader.setText("Phòng: " + room);
         lblOnlineCount.setText("● Đang online");
+        
+        String init = UiTheme.initials(room);
+        Color avColor = UiTheme.avatarColor(room);
+        lblChatAvatar.setText(init);
+        lblChatAvatar.setBackground(avColor);
+        
         clearChatFeed();
         cardLayout.show(contentArea, SCREEN_CHAT);
         if (udpReaderThread == null || !udpReaderThread.isAlive()) {
@@ -1526,9 +1575,37 @@ public final class Client extends JFrame {
         }
     }
 
+    private void updateSidebarRoomList(java.util.List<String> rooms) {
+        if (roomListPanel == null) return;
+        roomListPanel.removeAll();
+        if (rooms.isEmpty()) {
+            roomListPanel.add(makeRoomListItem("—", "Chưa có phòng", true));
+        } else {
+            for (String r : rooms) {
+                boolean active = r.equals(currentRoom);
+                JPanel item = makeRoomListItem(r, active ? "Đang chat" : "Nhấn để vào", active);
+                item.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+                item.addMouseListener(new java.awt.event.MouseAdapter() {
+                    @Override public void mouseClicked(java.awt.event.MouseEvent e) {
+                        currentRoom = r;
+                        switchToChat(r);
+                        updateSidebarRoomList(rooms); // vẽ lại để cập nhật trạng thái active
+                    }
+                });
+                roomListPanel.add(item);
+                roomListPanel.add(Box.createRigidArea(new Dimension(0, 2)));
+            }
+        }
+        roomListPanel.revalidate();
+        roomListPanel.repaint();
+    }
+
     private void backToWaitingUi() {
         if (waitTimer != null)
             waitTimer.stop();
+        if (roomListPanel != null) {
+            updateSidebarRoomList(new java.util.ArrayList<>());
+        }
         clearChatFeed();
         showWaitUi();
     }

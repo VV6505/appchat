@@ -30,7 +30,13 @@ public final class Server {
     private final Map<String, ClientHandler> onlineByName = new ConcurrentHashMap<>();
     private final Set<String> waitingUsers = ConcurrentHashMap.newKeySet();
     private final Map<String, Set<String>> rooms = new ConcurrentHashMap<>();
-    private final Map<String, String> userToRoom = new ConcurrentHashMap<>();
+    
+    // Một user có thể tham gia nhiều phòng cùng lúc
+    private final Map<String, Set<String>> userRooms = new ConcurrentHashMap<>();
+    
+    // Những user mà hệ thống đang quản lý (kể cả khi đã ngắt kết nối)
+    private final Set<String> knownUsers = ConcurrentHashMap.newKeySet();
+    
     private final Map<String, InetSocketAddress> udpByUser = new ConcurrentHashMap<>();
 
     // ── Admin TCP connections (separate handler set) ──────────────────────────
@@ -128,7 +134,16 @@ public final class Server {
                     ah.run(); // chạy trực tiếp trên thread này
                     server.adminHandlers.remove(ah);
                 } else if (first.startsWith("CONNECT|")) {
-                    // User thường — chuyển sang ClientHandler
+                    String name = first.substring("CONNECT|".length()).trim();
+                    if (server.isUsernameOnline(name)) {
+                        out.writeUTF("ERROR|Người dùng này đang online ở máy khác");
+                        out.flush();
+                        socket.close();
+                        return;
+                    }
+                    // OK_WAITING báo cho Client biết kết nối thành công, có thể gửi lệnh tiếp theo
+                    out.writeUTF("OK_WAITING");
+                    out.flush();
                     ClientHandler ch = new ClientHandler(socket, server, first, in, out);
                     ch.run();
                 } else {
@@ -153,7 +168,8 @@ public final class Server {
         onlineByName.clear();
         waitingUsers.clear();
         rooms.clear();
-        userToRoom.clear();
+        userRooms.clear();
+        knownUsers.clear();
         udpByUser.clear();
         ServerSocket ss = tcpSocket;
         tcpSocket = null;
@@ -185,6 +201,11 @@ public final class Server {
     public boolean isUsernameOnline(String name) {
         return onlineByName.containsKey(name);
     }
+    
+    public boolean isUsernameTaken(String name) {
+        // Tên bị coi là trùng nếu đang online HOẶC đang được Admin giữ thông tin
+        return onlineByName.containsKey(name) || knownUsers.contains(name);
+    }
 
     public boolean isUserInRoom(String username, String room) {
         Set<String> m = rooms.get(room);
@@ -203,16 +224,13 @@ public final class Server {
     public void removeClient(ClientHandler handler, String username) {
         if (username == null) return;
         onlineByName.remove(username, handler);
-        waitingUsers.remove(username);
         udpByUser.remove(username);
-        String room = userToRoom.remove(username);
-        if (room != null) {
-            Set<String> set = rooms.get(room);
-            if (set != null) set.remove(username);
-        }
+        
+        // Theo yêu cầu: KHÔNG xóa username khỏi knownUsers và userRooms 
+        // để admin có thể giữ thông tin khi họ quay lại.
+        
         if (!shuttingDown) {
-            log(username + " left (disconnect)");
-            broadcastTcp("SYSTEM|" + username + " đã rời khỏi nhóm");
+            log(username + " disconnected (session kept)");
         }
         broadcastAdminEvent("USER_DISCONNECTED|" + username);
     }
@@ -221,27 +239,26 @@ public final class Server {
         for (ClientHandler h : new ArrayList<>(onlineByName.values())) h.sendUtf(line);
     }
 
-    void broadcastRoomFile(String fromUser, String fileName, byte[] data) {
-        String room = userToRoom.get(fromUser);
-        if (room == null) return;
-        for (String member : getRoomMembers(room)) {
+    void broadcastRoomFile(String fromUser, String fileName, byte[] data, String targetRoom) {
+        if (targetRoom == null) return;
+        for (String member : getRoomMembers(targetRoom)) {
             if (member.equals(fromUser)) continue;
             ClientHandler h = onlineByName.get(member);
-            if (h != null) h.sendFileRecv(fromUser, fileName, data);
+            if (h != null) h.sendFileRecv(fromUser, fileName, data, targetRoom);
         }
     }
 
-    public void handleTcpFileUpload(String username, String fileName, byte[] data) {
+    public void handleTcpFileUpload(String username, String fileName, byte[] data, String targetRoom) {
         if (data == null || data.length == 0) return;
         if (data.length > MAX_FILE_BYTES) {
             log(username + " — file quá lớn: " + fileName);
             return;
         }
-        if (userToRoom.get(username) == null) {
-            log(username + " — bỏ qua file (chưa trong phòng): " + fileName);
+        if (!isUserInRoom(username, targetRoom)) {
+            log(username + " — không có quyền gửi vào phòng: " + targetRoom);
             return;
         }
-        broadcastRoomFile(username, fileName, data);
+        broadcastRoomFile(username, fileName, data, targetRoom);
     }
 
     public void createRoom(String name) {
@@ -252,54 +269,87 @@ public final class Server {
         broadcastAdminEvent("ROOM_CREATED|" + r);
     }
 
+    public void purgeUser(String username) {
+        String u = username == null ? "" : username.trim();
+        if (u.isEmpty()) return;
+        
+        // Chỉ admin mới gọi hàm này để xóa trắng thông tin một user
+        knownUsers.remove(u);
+        Set<String> rms = userRooms.remove(u);
+        if (rms != null) {
+            for (String r : rms) {
+                Set<String> m = rooms.get(r);
+                if (m != null) m.remove(u);
+            }
+        }
+        
+        ClientHandler h = onlineByName.get(u);
+        if (h != null) h.sendUtf("PURGED"); // Báo cho client bị xóa
+        
+        log("User purged by admin: " + u);
+        broadcastAdminEvent("USER_PURGED|" + u);
+    }
+    
     public void deleteRoom(String roomName) {
         String r = roomName == null ? "" : roomName.trim();
         if (r.isEmpty()) return;
         Set<String> members = rooms.remove(r);
         if (members == null) return;
-        for (String u : new ArrayList<>(members)) {
-            userToRoom.remove(u);
-            waitingUsers.add(u);
-            ClientHandler h = onlineByName.get(u);
-            if (h != null) h.sendUtf("BACK_TO_WAITING");
+        for (String u : members) {
+            Set<String> uRooms = userRooms.get(u);
+            if (uRooms != null) {
+                uRooms.remove(r);
+                sendRoomListUpdate(u);
+            }
         }
         log("Room deleted: " + r);
         broadcastAdminEvent("ROOM_DELETED|" + r);
     }
 
-    public void removeUserFromRoom(String username) {
+    public void removeUserFromRoom(String username, String roomName) {
         String u = username == null ? "" : username.trim();
-        if (u.isEmpty()) return;
-        String room = userToRoom.remove(u);
-        if (room == null) return;
-        Set<String> set = rooms.get(room);
-        if (set != null) set.remove(u);
-        waitingUsers.add(u);
-        ClientHandler h = onlineByName.get(u);
-        if (h != null) h.sendUtf("BACK_TO_WAITING");
-        log(u + " removed from room " + room);
-        broadcastAdminEvent("USER_ROOM_CHANGED|" + u + "|" + room + "|waiting");
+        String r = roomName == null ? "" : roomName.trim();
+        if (u.isEmpty() || r.isEmpty()) return;
+        
+        Set<String> roomMembers = rooms.get(r);
+        if (roomMembers != null) roomMembers.remove(u);
+        
+        Set<String> uRooms = userRooms.get(u);
+        if (uRooms != null) uRooms.remove(r);
+        
+        sendRoomListUpdate(u);
+        log(u + " removed from room " + r);
+        broadcastAdminEvent("USER_ROOM_CHANGED|" + u + "|REMOVED|" + r);
     }
 
     public void addWaitingUserToRoom(String username, String roomName) {
         String u = username == null ? "" : username.trim();
         String r = roomName == null ? "" : roomName.trim();
         if (u.isEmpty() || r.isEmpty()) return;
-        if (!waitingUsers.contains(u)) return;
+        
         rooms.computeIfAbsent(r, k -> ConcurrentHashMap.newKeySet());
-        waitingUsers.remove(u);
-        userToRoom.put(u, r);
+        userRooms.computeIfAbsent(u, k -> ConcurrentHashMap.newKeySet());
+        
         rooms.get(r).add(u);
-        ClientHandler h = onlineByName.get(u);
-        if (h != null) {
-            h.sendUtf("JOINED_ROOM|" + r);
-            broadcastTcp("SYSTEM|" + u + " đã vào phòng " + r);
-        }
-        log(u + " joined " + r);
-        broadcastAdminEvent("USER_ROOM_CHANGED|" + u + "|waiting|" + r);
+        userRooms.get(u).add(r);
+        knownUsers.add(u); // Đã vào phòng thì coi như user được quản lý
+        
+        sendRoomListUpdate(u);
+        log(u + " added to " + r);
+        broadcastAdminEvent("USER_ROOM_CHANGED|" + u + "|ADDED|" + r);
+    }
+    
+    private void sendRoomListUpdate(String username) {
+        ClientHandler h = onlineByName.get(username);
+        if (h == null) return;
+        Set<String> ur = userRooms.get(username);
+        String list = (ur == null) ? "" : String.join(",", ur);
+        h.sendUtf("ROOM_LIST|" + list);
     }
 
-    /** Gửi event tới tất cả AdminHandler đang kết nối */
+    public void onClientReconnect(String username) {
+        sendRoomListUpdate(username);
+    }
     public void broadcastAdminEvent(String event) {
         for (AdminHandler ah : new ArrayList<>(adminHandlers)) {
             ah.sendEvent(event);

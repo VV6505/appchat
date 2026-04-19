@@ -55,9 +55,15 @@ public final class AdminHandler {
                         } else sendEvent("ADMIN_ERR|Thiếu user hoặc phòng");
                         break;
                     case "KICK_USER":
+                        if (parts.length >= 3 && !parts[1].isBlank() && !parts[2].isBlank()) {
+                            server.removeUserFromRoom(parts[1].trim(), parts[2].trim());
+                            sendEvent("ADMIN_ACK|Kick " + parts[1].trim() + " khỏi " + parts[2].trim());
+                        } else sendEvent("ADMIN_ERR|Thiếu user hoặc phòng");
+                        break;
+                    case "DELETE_USER_DATA":
                         if (parts.length >= 2 && !parts[1].isBlank()) {
-                            server.removeUserFromRoom(parts[1].trim());
-                            sendEvent("ADMIN_ACK|Kick " + parts[1].trim() + " về waiting");
+                            server.purgeUser(parts[1].trim());
+                            sendEvent("ADMIN_ACK|Đã xóa trắng thông tin: " + parts[1].trim());
                         } else sendEvent("ADMIN_ERR|Thiếu tên user");
                         break;
                     case "REQUEST_SNAPSHOT":
