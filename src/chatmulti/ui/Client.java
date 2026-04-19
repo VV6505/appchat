@@ -579,12 +579,12 @@ public final class Client extends JFrame {
         final int udpPort;
 
         if (isQuick) {
-            host    = "192.168.2.18";
+            host    = "172.188.65.249";
             tcpPort = Server.TCP_PORT;
             udpPort = Server.UDP_PORT;
         } else {
-            String hostRaw = textOrEmpty(tfHost, "192.168.x.x");
-            host = hostRaw.isEmpty() ? "192.168.2.18" : hostRaw;
+            String hostRaw = textOrEmpty(tfHost, "172.188.x.x");
+            host = hostRaw.isEmpty() ? "172.188.65.249" : hostRaw;
             try {
                 tcpPort = Integer.parseInt(tfTcpPort.getText().trim());
                 udpPort = Integer.parseInt(tfUdpPort.getText().trim());
