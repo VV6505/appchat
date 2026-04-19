@@ -63,6 +63,10 @@ public final class Server {
         }
     }
 
+    public Map<String, ClientHandler> getOnlineByName() {
+        return onlineByName;
+    }
+
     public void setAutoJoinDefaultRoom(boolean enabled, String roomName) {
         this.autoJoinDefaultRoom = enabled;
         if (roomName != null && !roomName.isBlank()) {
@@ -135,13 +139,17 @@ public final class Server {
                     server.adminHandlers.remove(ah);
                 } else if (first.startsWith("CONNECT|")) {
                     String name = first.substring("CONNECT|".length()).trim();
-                    if (server.isUsernameOnline(name)) {
-                        out.writeUTF("ERROR|Người dùng này đang online ở máy khác");
-                        out.flush();
-                        socket.close();
-                        return;
+                
+                    // Kiểm tra và đá kết nối cũ nếu trùng tên
+                    ClientHandler oldHandler = server.getOnlineByName().get(name);
+                    if (oldHandler != null) {
+                        server.log("Phát hiện trùng tên: Đá kết nối cũ của " + name);
+                        oldHandler.sendUtf("FORCE_LOGOUT"); // Gửi lệnh báo hiệu cho máy cũ
+                        oldHandler.closeSocket();            // Đóng socket máy cũ
+                        server.removeClient(oldHandler, name); // Dọn dẹp dữ liệu máy cũ trên Server
                     }
-                    // OK_WAITING báo cho Client biết kết nối thành công, có thể gửi lệnh tiếp theo
+                
+                    // Sau khi đá xong, cho phép kết nối mới vào như bình thường
                     out.writeUTF("OK_WAITING");
                     out.flush();
                     ClientHandler ch = new ClientHandler(socket, server, first, in, out);
@@ -225,6 +233,7 @@ public final class Server {
         if (username == null) return;
         onlineByName.remove(username, handler);
         udpByUser.remove(username);
+        waitingUsers.remove(username);
         
         // Theo yêu cầu: KHÔNG xóa username khỏi knownUsers và userRooms 
         // để admin có thể giữ thông tin khi họ quay lại.
@@ -273,7 +282,13 @@ public final class Server {
         String u = username == null ? "" : username.trim();
         if (u.isEmpty()) return;
         
-        // Chỉ admin mới gọi hàm này để xóa trắng thông tin một user
+        // Gửi lệnh đá văng về Login trước khi xóa dữ liệu
+        ClientHandler h = onlineByName.get(u);
+        if (h != null) {
+            h.sendUtf("PURGED"); // Client nhận lệnh này sẽ về Login
+            removeClient(h, u);   // Ngắt kết nối luôn
+        }
+
         knownUsers.remove(u);
         Set<String> rms = userRooms.remove(u);
         if (rms != null) {
@@ -282,9 +297,6 @@ public final class Server {
                 if (m != null) m.remove(u);
             }
         }
-        
-        ClientHandler h = onlineByName.get(u);
-        if (h != null) h.sendUtf("PURGED"); // Báo cho client bị xóa
         
         log("User purged by admin: " + u);
         broadcastAdminEvent("USER_PURGED|" + u);
@@ -317,7 +329,18 @@ public final class Server {
         Set<String> uRooms = userRooms.get(u);
         if (uRooms != null) uRooms.remove(r);
         
-        sendRoomListUpdate(u);
+        ClientHandler h = onlineByName.get(u);
+        if (h != null) {
+            // Nếu user không còn ở phòng nào, bắt về màn hình đợi
+            Set<String> ur = userRooms.get(u);
+            if (ur == null || ur.isEmpty()) {
+                waitingUsers.add(u); // Đưa vào danh sách đợi
+                h.sendUtf("BACK_TO_WAITING"); 
+            } else {
+                sendRoomListUpdate(u); // Cập nhật lại danh sách phòng còn lại
+            }
+        }
+
         log(u + " removed from room " + r);
         broadcastAdminEvent("USER_ROOM_CHANGED|" + u + "|REMOVED|" + r);
     }

@@ -597,13 +597,7 @@ public final class Client extends JFrame {
         // Input field bo tròn (chiếm tối đa không gian)
         // Dùng font Segoe UI làm font chính, nó sẽ tự động fallback sang Segoe UI Emoji
         // cho các ký tự emoji trên Windows 10/11 mà không làm hỏng font chữ thường.
-        tfMsg.setFont(UiTheme.uiFont(Font.PLAIN, 14));
-        tfMsg.setBackground(UiTheme.BG);
-        tfMsg.setForeground(UiTheme.TEXT);
-        tfMsg.setBorder(BorderFactory.createCompoundBorder(
-                new UiTheme.RoundedBorder(22, UiTheme.BORDER, 1),
-                BorderFactory.createEmptyBorder(9, 16, 9, 16)));
-        tfMsg.setOpaque(true);
+        UiTheme.styleRoundedField(tfMsg);
         addPlaceholder(tfMsg, PH_MSG);
         tfMsg.addActionListener(e -> sendTextUdp());
         bar.add(tfMsg, BorderLayout.CENTER);
@@ -1084,6 +1078,27 @@ public final class Client extends JFrame {
                 return;
             while (!closing) {
                 String line = in.readUTF().trim();
+
+                // Kiểm tra lệnh FORCE_LOGOUT
+                if ("FORCE_LOGOUT".equals(line)) {
+                    SwingUtilities.invokeLater(() -> {
+                        JOptionPane.showMessageDialog(this, 
+                            "Tài khoản của bạn đã đăng nhập ở một máy khác! Bạn sẽ bị đăng xuất.", 
+                            "Thông báo", JOptionPane.WARNING_MESSAGE);
+                        disconnectToLogin(); // Gọi hàm có sẵn để dọn dẹp và về màn hình Login
+                    });
+                    break; // Thoát khỏi luồng đọc
+                }
+                
+                // Kiểm tra lệnh PURGED
+                if ("PURGED".equals(line)) {
+                    SwingUtilities.invokeLater(() -> {
+                        JOptionPane.showMessageDialog(this, "Dữ liệu của bạn đã bị Admin xóa sạch!", "Thông báo", JOptionPane.WARNING_MESSAGE);
+                        disconnectToLogin(); // Về màn hình Login
+                    });
+                    break;
+                }
+
                 if (line.startsWith("ROOM_LIST|")) {
                     String list = line.substring("ROOM_LIST|".length());
                     java.util.List<String> rList = list.isEmpty() ? new java.util.ArrayList<>()
@@ -1700,7 +1715,7 @@ public final class Client extends JFrame {
         grid.setBorder(new EmptyBorder(8, 10, 8, 10));
         for (String em : INLINE_EMOJIS) {
             JButton b = new JButton(em);
-            b.setFont(b.getFont().deriveFont(18f));
+            b.setFont(UiTheme.loadEmojiFont().deriveFont(18f));
             b.setFocusPainted(false);
             b.setOpaque(false);
             b.setContentAreaFilled(false);

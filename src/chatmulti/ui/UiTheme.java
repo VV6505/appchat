@@ -83,6 +83,35 @@ public final class UiTheme {
         return f;
     }
 
+    public static Font loadEmojiFont() {
+        try {
+            // Đường dẫn tương ứng với cấu trúc thư mục trong src
+            java.io.InputStream is = UiTheme.class.getResourceAsStream("/chatmulti/fonts/NotoColorEmoji.ttf");
+            if (is == null) {
+                return new Font("Segoe UI Emoji", Font.PLAIN, 18); // Fallback nếu không tìm thấy file
+            }
+            Font font = Font.createFont(Font.TRUETYPE_FONT, is);
+            // Đăng ký font với Graphics Environment để sử dụng toàn hệ thống
+            GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
+            ge.registerFont(font);
+            
+            return font.deriveFont(Font.PLAIN, 18f);
+        } catch (Exception e) {
+            System.err.println("Không thể tải Emoji Font: " + e.getMessage());
+            return new Font("SansSerif", Font.PLAIN, 18);
+        }
+    }
+
+    public static void styleRoundedField(JTextField tf) {
+        tf.setFont(loadEmojiFont()); // Sử dụng font emoji có màu
+        tf.setOpaque(false);
+        tf.setBorder(BorderFactory.createCompoundBorder(
+                new RoundedBorder(22, BORDER, 1),
+                BorderFactory.createEmptyBorder(10, 16, 10, 16)));
+        tf.setBackground(BG);
+        tf.setForeground(TEXT);
+    }
+
     // ── Rounded border tùy chỉnh ───────────────────────────────────────────────
     public static class RoundedBorder extends AbstractBorder {
         private final int radius;
@@ -409,16 +438,6 @@ public final class UiTheme {
         return p;
     }
 
-    // ── Input field bo tròn ────────────────────────────────────────────────────
-    public static void styleRoundedField(JTextField tf) {
-        tf.setFont(uiFont(Font.PLAIN, 14));
-        tf.setOpaque(false);
-        tf.setBorder(BorderFactory.createCompoundBorder(
-                new RoundedBorder(22, BORDER, 1),
-                BorderFactory.createEmptyBorder(10, 16, 10, 16)));
-        tf.setBackground(BG);
-        tf.setForeground(TEXT);
-    }
 
     // ── Random avatar color by name ────────────────────────────────────────────
     private static final Color[] AVATAR_COLORS = {
