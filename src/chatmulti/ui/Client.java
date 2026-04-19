@@ -21,27 +21,27 @@ import java.nio.file.Files;
 public final class Client extends JFrame {
 
     private static final String PH_MSG = "Nhập tin nhắn...";
-    private static final String[] STICKERS  = {"👍","❤️","😂","🔥","🎉","👋","✨","🙏","😊","💯"};
+    private static final String[] STICKERS = { "👍", "❤️", "😂", "🔥", "🎉", "👋", "✨", "🙏", "😊", "💯" };
     private static final String[] INLINE_EMOJIS = {
-        "😀","😃","😄","😁","😅","🤣","😂","🙂","😉","😊","😍","🥰",
-        "😘","😋","😎","🤩","🥳","😇","🤔","😴","👍","👎","👏","🙌",
-        "🙏","💪","❤️","💔","🔥","✨","⭐","💯","🎉","🎁","✅","❌"
+            "😀", "😃", "😄", "😁", "😅", "🤣", "😂", "🙂", "😉", "😊", "😍", "🥰",
+            "😘", "😋", "😎", "🤩", "🥳", "😇", "🤔", "😴", "👍", "👎", "👏", "🙌",
+            "🙏", "💪", "❤️", "💔", "🔥", "✨", "⭐", "💯", "🎉", "🎁", "✅", "❌"
     };
 
     // ── Screens (CardLayout) ───────────────────────────────────────────────────
     private static final String SCREEN_LOGIN = "LOGIN";
-    private static final String SCREEN_WAIT  = "WAIT";
-    private static final String SCREEN_CHAT  = "CHAT";
+    private static final String SCREEN_WAIT = "WAIT";
+    private static final String SCREEN_CHAT = "CHAT";
     private static final String SCREEN_ADMIN = "ADMIN";
 
     private final CardLayout cardLayout = new CardLayout();
-    private final JPanel     contentArea = new JPanel(cardLayout);
+    private final JPanel contentArea = new JPanel(cardLayout);
 
     // ── Login fields ───────────────────────────────────────────────────────────
-    private final JTextField    tfUser     = new JTextField();
-    private final JTextField    tfHost     = new JTextField();
-    private final JTextField    tfTcpPort  = new JTextField();
-    private final JTextField    tfUdpPort  = new JTextField();
+    private final JTextField tfUser = new JTextField();
+    private final JTextField tfHost = new JTextField();
+    private final JTextField tfTcpPort = new JTextField();
+    private final JTextField tfUdpPort = new JTextField();
     private final JPasswordField tfAdminPass = new JPasswordField();
 
     // ── Wait screen ────────────────────────────────────────────────────────────
@@ -51,39 +51,39 @@ public final class Client extends JFrame {
     private Timer waitTimer;
 
     // ── Chat screen ────────────────────────────────────────────────────────────
-    private JPanel      chatFeed;
+    private JPanel chatFeed;
     private JScrollPane chatScroll;
     private final JTextField tfMsg = new JTextField();
     private final JLabel lblRoomHeader = new JLabel("Phòng: —");
     private final JLabel lblOnlineCount = new JLabel("Đang online");
 
     // ── Admin screen ───────────────────────────────────────────────────────────
-    private final DefaultListModel<String> adminOnlineModel  = new DefaultListModel<>();
+    private final DefaultListModel<String> adminOnlineModel = new DefaultListModel<>();
     private final DefaultListModel<String> adminWaitingModel = new DefaultListModel<>();
-    private final DefaultListModel<String> adminRoomsModel   = new DefaultListModel<>();
-    private final JTextArea adminLogArea  = new JTextArea();
+    private final DefaultListModel<String> adminRoomsModel = new DefaultListModel<>();
+    private final JTextArea adminLogArea = new JTextArea();
     private final JTextField tfAdminNewRoom = new JTextField();
     private final JComboBox<String> cbAdminWaiting = new JComboBox<>();
-    private final JComboBox<String> cbAdminRooms   = new JComboBox<>();
-    private final JComboBox<String> cbAdminInRoom  = new JComboBox<>();
+    private final JComboBox<String> cbAdminRooms = new JComboBox<>();
+    private final JComboBox<String> cbAdminInRoom = new JComboBox<>();
 
     // ── Network ────────────────────────────────────────────────────────────────
-    private volatile Socket           tcpSocket;
-    private volatile DataInputStream  tcpIn;
+    private volatile Socket tcpSocket;
+    private volatile DataInputStream tcpIn;
     private volatile DataOutputStream tcpOut;
-    private volatile DatagramSocket   udpSocket;
-    private volatile Thread           tcpReaderThread;
-    private volatile Thread           udpReaderThread;
-    private volatile String           username;
-    private volatile String           currentRoom;
-    private volatile String           serverHost;
-    private volatile boolean          closing;
-    private volatile boolean          isAdmin;
+    private volatile DatagramSocket udpSocket;
+    private volatile Thread tcpReaderThread;
+    private volatile Thread udpReaderThread;
+    private volatile String username;
+    private volatile String currentRoom;
+    private volatile String serverHost;
+    private volatile boolean closing;
+    private volatile boolean isAdmin;
 
-    private volatile Socket           adminTcpSocket;
-    private volatile DataInputStream  adminTcpIn;
+    private volatile Socket adminTcpSocket;
+    private volatile DataInputStream adminTcpIn;
     private volatile DataOutputStream adminTcpOut;
-    private volatile Thread           adminReaderThread;
+    private volatile Thread adminReaderThread;
 
     // ─────────────────────────────────────────────────────────────────────────
     public Client() {
@@ -102,16 +102,17 @@ public final class Client extends JFrame {
         root.add(sidebar, BorderLayout.WEST);
 
         contentArea.setBackground(UiTheme.BG);
-        contentArea.add(buildLoginScreen(),  SCREEN_LOGIN);
-        contentArea.add(buildWaitScreen(),   SCREEN_WAIT);
-        contentArea.add(buildChatScreen(),   SCREEN_CHAT);
-        contentArea.add(buildAdminScreen(),  SCREEN_ADMIN);
+        contentArea.add(buildLoginScreen(), SCREEN_LOGIN);
+        contentArea.add(buildWaitScreen(), SCREEN_WAIT);
+        contentArea.add(buildChatScreen(), SCREEN_CHAT);
+        contentArea.add(buildAdminScreen(), SCREEN_ADMIN);
         root.add(contentArea, BorderLayout.CENTER);
 
         setContentPane(root);
 
         addWindowListener(new java.awt.event.WindowAdapter() {
-            @Override public void windowClosing(java.awt.event.WindowEvent e) {
+            @Override
+            public void windowClosing(java.awt.event.WindowEvent e) {
                 closing = true;
                 stopNetworking();
             }
@@ -121,17 +122,18 @@ public final class Client extends JFrame {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    //  SIDEBAR
+    // SIDEBAR
     // ═══════════════════════════════════════════════════════════════════════════
     private JPanel buildSidebar() {
         JPanel sb = new JPanel() {
-            @Override protected void paintComponent(Graphics g) {
+            @Override
+            protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setColor(UiTheme.SIDEBAR_BG);
                 g2.fillRect(0, 0, getWidth(), getHeight());
                 // subtle right edge
                 g2.setColor(new Color(0x1E1B5E));
-                g2.fillRect(getWidth()-1, 0, 1, getHeight());
+                g2.fillRect(getWidth() - 1, 0, 1, getHeight());
                 g2.dispose();
             }
         };
@@ -144,7 +146,8 @@ public final class Client extends JFrame {
 
         // Nút Admin (chỉ hiện khi là admin) — dùng text thuần
         JButton gearBtn = new JButton("ADM") {
-            @Override protected void paintComponent(Graphics g) {
+            @Override
+            protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 if (getModel().isRollover()) {
@@ -157,19 +160,25 @@ public final class Client extends JFrame {
         };
         gearBtn.setFont(UiTheme.uiFont(Font.BOLD, 10));
         gearBtn.setForeground(new Color(0xAAACCC));
-        gearBtn.setFocusPainted(false); gearBtn.setOpaque(false);
-        gearBtn.setContentAreaFilled(false); gearBtn.setBorderPainted(false);
+        gearBtn.setFocusPainted(false);
+        gearBtn.setOpaque(false);
+        gearBtn.setContentAreaFilled(false);
+        gearBtn.setBorderPainted(false);
         gearBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         gearBtn.setPreferredSize(new Dimension(44, 32));
         gearBtn.setMaximumSize(new Dimension(44, 32));
         gearBtn.setAlignmentX(Component.CENTER_ALIGNMENT);
-        gearBtn.addActionListener(e -> { if (isAdmin) cardLayout.show(contentArea, SCREEN_ADMIN); });
+        gearBtn.addActionListener(e -> {
+            if (isAdmin)
+                cardLayout.show(contentArea, SCREEN_ADMIN);
+        });
         sb.add(gearBtn);
         sb.add(Box.createRigidArea(new Dimension(0, 8)));
 
         // Avatar — vẽ bằng Graphics2D, luôn hiển thị đúng
         JLabel avatarMe = new JLabel("?", SwingConstants.CENTER) {
-            @Override protected void paintComponent(Graphics g) {
+            @Override
+            protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setColor(new Color(0xEF4444));
@@ -194,12 +203,13 @@ public final class Client extends JFrame {
         JButton b = new JButton(icon);
         UiTheme.styleSidebarIcon(b, active);
         b.setAlignmentX(Component.CENTER_ALIGNMENT);
-        if (onClick != null) b.addActionListener(e -> onClick.run());
+        if (onClick != null)
+            b.addActionListener(e -> onClick.run());
         return b;
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    //  LOGIN SCREEN
+    // LOGIN SCREEN
     // ═══════════════════════════════════════════════════════════════════════════
     private JPanel buildLoginScreen() {
         JPanel outer = new JPanel(new GridBagLayout());
@@ -217,12 +227,16 @@ public final class Client extends JFrame {
         g.weightx = 1;
 
         // Logo + title
-        g.gridx = 0; g.gridy = 0; g.gridwidth = 1;
+        g.gridx = 0;
+        g.gridy = 0;
+        g.gridwidth = 1;
         JLabel logo = new JLabel("◉", SwingConstants.CENTER) {
-            @Override protected void paintComponent(Graphics gr) {
+            @Override
+            protected void paintComponent(Graphics gr) {
                 Graphics2D g2 = (Graphics2D) gr.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                GradientPaint gp = new GradientPaint(0, 0, UiTheme.PRIMARY, getWidth(), getHeight(), new Color(0x9333EA));
+                GradientPaint gp = new GradientPaint(0, 0, UiTheme.PRIMARY, getWidth(), getHeight(),
+                        new Color(0x9333EA));
                 g2.setPaint(gp);
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), 16, 16);
                 g2.dispose();
@@ -249,28 +263,34 @@ public final class Client extends JFrame {
         sub.setForeground(UiTheme.MUTED);
         card.add(sub, g);
 
-        g.gridy = 3; g.insets = new Insets(14, 0, 3, 0);
+        g.gridy = 3;
+        g.insets = new Insets(14, 0, 3, 0);
         card.add(makeFieldLabel("Tên của bạn"), g);
-        g.gridy = 4; g.insets = new Insets(0, 0, 6, 0);
+        g.gridy = 4;
+        g.insets = new Insets(0, 0, 6, 0);
         styleLoginField(tfUser, "Nhập username...");
         card.add(tfUser, g);
 
-        g.gridy = 5; g.insets = new Insets(4, 0, 3, 0);
+        g.gridy = 5;
+        g.insets = new Insets(4, 0, 3, 0);
         card.add(makeFieldLabel("IP Server"), g);
-        g.gridy = 6; g.insets = new Insets(0, 0, 6, 0);
+        g.gridy = 6;
+        g.insets = new Insets(0, 0, 6, 0);
         styleLoginField(tfHost, "172.188.65.249");
         tfHost.setText("172.188.65.249");
         card.add(tfHost, g);
 
         // TCP / UDP row
-        g.gridy = 7; g.insets = new Insets(4, 0, 3, 0);
+        g.gridy = 7;
+        g.insets = new Insets(4, 0, 3, 0);
         JPanel portLabelRow = new JPanel(new GridLayout(1, 2, 12, 0));
         portLabelRow.setOpaque(false);
         portLabelRow.add(makeFieldLabel("Cổng TCP"));
         portLabelRow.add(makeFieldLabel("Cổng UDP"));
         card.add(portLabelRow, g);
 
-        g.gridy = 8; g.insets = new Insets(0, 0, 6, 0);
+        g.gridy = 8;
+        g.insets = new Insets(0, 0, 6, 0);
         JPanel portRow = new JPanel(new GridLayout(1, 2, 12, 0));
         portRow.setOpaque(false);
         tfTcpPort.setText(String.valueOf(Server.TCP_PORT));
@@ -282,14 +302,17 @@ public final class Client extends JFrame {
         card.add(portRow, g);
 
         // Divider
-        g.gridy = 9; g.insets = new Insets(8, 0, 8, 0);
+        g.gridy = 9;
+        g.insets = new Insets(8, 0, 8, 0);
         JSeparator sep = new JSeparator();
         sep.setForeground(UiTheme.BORDER);
         card.add(sep, g);
 
-        g.gridy = 10; g.insets = new Insets(0, 0, 3, 0);
+        g.gridy = 10;
+        g.insets = new Insets(0, 0, 3, 0);
         card.add(makeFieldLabel("Mật khẩu admin (tùy chọn)"), g);
-        g.gridy = 11; g.insets = new Insets(0, 0, 14, 0);
+        g.gridy = 11;
+        g.insets = new Insets(0, 0, 14, 0);
         tfAdminPass.setFont(UiTheme.uiFont(Font.PLAIN, 14));
         tfAdminPass.setBorder(BorderFactory.createCompoundBorder(
                 new UiTheme.RoundedBorder(10, UiTheme.BORDER, 1),
@@ -298,14 +321,16 @@ public final class Client extends JFrame {
         card.add(tfAdminPass, g);
 
         // Buttons
-        g.gridy = 12; g.insets = new Insets(0, 0, 8, 0);
+        g.gridy = 12;
+        g.insets = new Insets(0, 0, 8, 0);
         JButton btnConnect = new JButton("Kết nối");
         UiTheme.stylePrimaryButton(btnConnect);
         btnConnect.setMaximumSize(new Dimension(Integer.MAX_VALUE, 44));
         btnConnect.addActionListener(e -> doConnect(false));
         card.add(btnConnect, g);
 
-        g.gridy = 13; g.insets = new Insets(0, 0, 0, 0);
+        g.gridy = 13;
+        g.insets = new Insets(0, 0, 0, 0);
         JButton btnQuick = new JButton("Quick Connect  (" + "172.188.65.249" + ")");
         UiTheme.styleSecondaryButton(btnQuick);
         btnQuick.addActionListener(e -> doConnect(true));
@@ -337,13 +362,23 @@ public final class Client extends JFrame {
 
     private static void addPlaceholder(JTextField tf, String ph) {
         tf.setForeground(UiTheme.MUTED);
-        if (tf.getText().isEmpty()) tf.setText(ph);
+        if (tf.getText().isEmpty())
+            tf.setText(ph);
         tf.addFocusListener(new FocusAdapter() {
-            @Override public void focusGained(FocusEvent e) {
-                if (ph.equals(tf.getText())) { tf.setText(""); tf.setForeground(UiTheme.TEXT); }
+            @Override
+            public void focusGained(FocusEvent e) {
+                if (ph.equals(tf.getText())) {
+                    tf.setText("");
+                    tf.setForeground(UiTheme.TEXT);
+                }
             }
-            @Override public void focusLost(FocusEvent e) {
-                if (tf.getText().isEmpty()) { tf.setText(ph); tf.setForeground(UiTheme.MUTED); }
+
+            @Override
+            public void focusLost(FocusEvent e) {
+                if (tf.getText().isEmpty()) {
+                    tf.setText(ph);
+                    tf.setForeground(UiTheme.MUTED);
+                }
             }
         });
     }
@@ -357,7 +392,7 @@ public final class Client extends JFrame {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    //  WAIT SCREEN
+    // WAIT SCREEN
     // ═══════════════════════════════════════════════════════════════════════════
     private JPanel buildWaitScreen() {
         JPanel outer = new JPanel(new GridBagLayout());
@@ -408,7 +443,7 @@ public final class Client extends JFrame {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    //  CHAT SCREEN  — sidebar phòng + khung chat
+    // CHAT SCREEN — sidebar phòng + khung chat
     // ═══════════════════════════════════════════════════════════════════════════
     private JPanel buildChatScreen() {
         JPanel root = new JPanel(new BorderLayout());
@@ -481,7 +516,8 @@ public final class Client extends JFrame {
 
     private JPanel makeRoomListItem(String roomName, String lastMsg, boolean active) {
         JPanel item = new JPanel(new BorderLayout(10, 0)) {
-            @Override protected void paintComponent(Graphics g) {
+            @Override
+            protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 if (active) {
@@ -597,8 +633,7 @@ public final class Client extends JFrame {
         attachMenu.addSeparator();
         attachMenu.add(miFile);
 
-        btnAttach.addActionListener(e ->
-                attachMenu.show(btnAttach, 0, -attachMenu.getPreferredSize().height));
+        btnAttach.addActionListener(e -> attachMenu.show(btnAttach, 0, -attachMenu.getPreferredSize().height));
 
         // Nút Gửi (text)
         JButton btnSend = new JButton("Gửi");
@@ -628,18 +663,23 @@ public final class Client extends JFrame {
                 BorderFactory.createEmptyBorder(5, 10, 5, 10)));
         // Hover
         b.addMouseListener(new java.awt.event.MouseAdapter() {
-            @Override public void mouseEntered(java.awt.event.MouseEvent e) {
-                b.setForeground(UiTheme.PRIMARY); b.repaint();
+            @Override
+            public void mouseEntered(java.awt.event.MouseEvent e) {
+                b.setForeground(UiTheme.PRIMARY);
+                b.repaint();
             }
-            @Override public void mouseExited(java.awt.event.MouseEvent e) {
-                b.setForeground(UiTheme.MUTED); b.repaint();
+
+            @Override
+            public void mouseExited(java.awt.event.MouseEvent e) {
+                b.setForeground(UiTheme.MUTED);
+                b.repaint();
             }
         });
         return b;
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    //  ADMIN SCREEN
+    // ADMIN SCREEN
     // ═══════════════════════════════════════════════════════════════════════════
     private JPanel buildAdminScreen() {
         JPanel root = new JPanel(new BorderLayout());
@@ -698,23 +738,35 @@ public final class Client extends JFrame {
         int row = 0;
 
         // Section label
-        g.gridx = 0; g.gridy = row; g.gridwidth = 4; g.fill = GridBagConstraints.HORIZONTAL;
+        g.gridx = 0;
+        g.gridy = row;
+        g.gridwidth = 4;
+        g.fill = GridBagConstraints.HORIZONTAL;
         JLabel lbRoom = UiTheme.sectionLabel("Quản lý phòng");
         ctrlCard.add(lbRoom, g);
-        g.gridwidth = 1; g.fill = GridBagConstraints.NONE;
+        g.gridwidth = 1;
+        g.fill = GridBagConstraints.NONE;
 
         row++;
-        g.gridx = 0; g.gridy = row;
+        g.gridx = 0;
+        g.gridy = row;
         ctrlCard.add(adminLabel("Tên phòng mới"), g);
-        g.gridx = 1; g.fill = GridBagConstraints.HORIZONTAL; g.weightx = 1;
+        g.gridx = 1;
+        g.fill = GridBagConstraints.HORIZONTAL;
+        g.weightx = 1;
         styleAdminField(tfAdminNewRoom);
         ctrlCard.add(tfAdminNewRoom, g);
-        g.gridx = 2; g.fill = GridBagConstraints.NONE; g.weightx = 0;
+        g.gridx = 2;
+        g.fill = GridBagConstraints.NONE;
+        g.weightx = 0;
         JButton btnCreate = new JButton("Tạo phòng");
         UiTheme.stylePrimaryButton(btnCreate);
         btnCreate.addActionListener(e -> {
             String r = tfAdminNewRoom.getText().trim();
-            if (!r.isEmpty()) { adminSendCmd("CREATE_ROOM|" + r); tfAdminNewRoom.setText(""); }
+            if (!r.isEmpty()) {
+                adminSendCmd("CREATE_ROOM|" + r);
+                tfAdminNewRoom.setText("");
+            }
         });
         ctrlCard.add(btnCreate, g);
         g.gridx = 3;
@@ -722,28 +774,36 @@ public final class Client extends JFrame {
         UiTheme.styleSecondaryButton(btnDel);
         btnDel.addActionListener(e -> {
             Object r = cbAdminRooms.getSelectedItem();
-            if (r == null) return;
+            if (r == null)
+                return;
             int ok = JOptionPane.showConfirmDialog(this,
                     "Xóa phòng \"" + r + "\"?", "Xác nhận", JOptionPane.OK_CANCEL_OPTION);
-            if (ok == JOptionPane.OK_OPTION) adminSendCmd("DELETE_ROOM|" + r.toString().trim());
+            if (ok == JOptionPane.OK_OPTION)
+                adminSendCmd("DELETE_ROOM|" + r.toString().trim());
         });
         ctrlCard.add(btnDel, g);
 
         row++;
-        g.gridx = 0; g.gridy = row;
+        g.gridx = 0;
+        g.gridy = row;
         ctrlCard.add(adminLabel("User chờ"), g);
-        g.gridx = 1; g.fill = GridBagConstraints.HORIZONTAL;
+        g.gridx = 1;
+        g.fill = GridBagConstraints.HORIZONTAL;
         styleAdminCombo(cbAdminWaiting);
         ctrlCard.add(cbAdminWaiting, g);
 
         row++;
-        g.gridx = 0; g.gridy = row; g.fill = GridBagConstraints.NONE;
+        g.gridx = 0;
+        g.gridy = row;
+        g.fill = GridBagConstraints.NONE;
         ctrlCard.add(adminLabel("Chuyển vào phòng"), g);
-        g.gridx = 1; g.fill = GridBagConstraints.HORIZONTAL;
+        g.gridx = 1;
+        g.fill = GridBagConstraints.HORIZONTAL;
         cbAdminRooms.addActionListener(e -> refillAdminInRoomCombo());
         styleAdminCombo(cbAdminRooms);
         ctrlCard.add(cbAdminRooms, g);
-        g.gridx = 2; g.fill = GridBagConstraints.NONE;
+        g.gridx = 2;
+        g.fill = GridBagConstraints.NONE;
         JButton btnAdd = new JButton("Add vào phòng");
         UiTheme.stylePrimaryButton(btnAdd);
         btnAdd.addActionListener(e -> {
@@ -755,12 +815,15 @@ public final class Client extends JFrame {
         ctrlCard.add(btnAdd, g);
 
         row++;
-        g.gridx = 0; g.gridy = row;
+        g.gridx = 0;
+        g.gridy = row;
         ctrlCard.add(adminLabel("Kick user"), g);
-        g.gridx = 1; g.fill = GridBagConstraints.HORIZONTAL;
+        g.gridx = 1;
+        g.fill = GridBagConstraints.HORIZONTAL;
         styleAdminCombo(cbAdminInRoom);
         ctrlCard.add(cbAdminInRoom, g);
-        g.gridx = 2; g.fill = GridBagConstraints.NONE;
+        g.gridx = 2;
+        g.fill = GridBagConstraints.NONE;
         JButton btnKick = new JButton("Kick về waiting");
         UiTheme.styleSecondaryButton(btnKick);
         btnKick.addActionListener(e -> {
@@ -771,7 +834,10 @@ public final class Client extends JFrame {
         ctrlCard.add(btnKick, g);
 
         row++;
-        g.gridx = 0; g.gridy = row; g.gridwidth = 4; g.anchor = GridBagConstraints.EAST;
+        g.gridx = 0;
+        g.gridy = row;
+        g.gridwidth = 4;
+        g.anchor = GridBagConstraints.EAST;
         JButton btnRefresh = new JButton("↺  Làm mới");
         UiTheme.styleSecondaryButton(btnRefresh);
         btnRefresh.addActionListener(e -> adminSendCmd("REQUEST_SNAPSHOT"));
@@ -823,7 +889,8 @@ public final class Client extends JFrame {
             JLabel txt = new JLabel(val.toString());
             txt.setFont(UiTheme.uiFont(Font.PLAIN, 12));
             txt.setForeground(UiTheme.TEXT);
-            row.add(dot); row.add(txt);
+            row.add(dot);
+            row.add(txt);
             return row;
         });
         JScrollPane sp = new JScrollPane(list);
@@ -868,16 +935,20 @@ public final class Client extends JFrame {
 
     private void adminSendCmd(String cmd) {
         DataOutputStream out = adminTcpOut;
-        if (out == null) return;
+        if (out == null)
+            return;
         try {
-            synchronized (out) { out.writeUTF("ADMIN_CMD|" + cmd); out.flush(); }
+            synchronized (out) {
+                out.writeUTF("ADMIN_CMD|" + cmd);
+                out.flush();
+            }
         } catch (IOException ex) {
             adminAppendLog("[Lỗi] " + ex.getMessage());
         }
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    //  CONNECT LOGIC
+    // CONNECT LOGIC
     // ═══════════════════════════════════════════════════════════════════════════
     private void doConnect(boolean isQuick) {
         String adminPass = new String(tfAdminPass.getPassword()).trim();
@@ -889,7 +960,8 @@ public final class Client extends JFrame {
             JOptionPane.showMessageDialog(this, "Username không hợp lệ.", "Lỗi", JOptionPane.WARNING_MESSAGE);
             return;
         }
-        if (tryAdmin && u.isEmpty()) u = "admin"; // placeholder, không gửi lên server
+        if (tryAdmin && u.isEmpty())
+            u = "admin"; // placeholder, không gửi lên server
 
         final String host;
         final int tcpPort, udpPort;
@@ -910,16 +982,16 @@ public final class Client extends JFrame {
         }
 
         stopNetworking();
-        username   = u;
+        username = u;
         serverHost = host;
-        closing    = false;
+        closing = false;
 
         new Thread(() -> {
             try {
                 Socket s = new Socket();
                 s.connect(new InetSocketAddress(host, tcpPort), 15000);
                 DataOutputStream out = new DataOutputStream(s.getOutputStream());
-                DataInputStream  in  = new DataInputStream(s.getInputStream());
+                DataInputStream in = new DataInputStream(s.getInputStream());
 
                 if (tryAdmin) {
                     out.writeUTF("ADMIN_LOGIN|" + adminPass);
@@ -932,7 +1004,9 @@ public final class Client extends JFrame {
                         stopNetworking();
                         return;
                     }
-                    adminTcpSocket = s; adminTcpIn = in; adminTcpOut = out;
+                    adminTcpSocket = s;
+                    adminTcpIn = in;
+                    adminTcpOut = out;
                     isAdmin = true;
                     SwingUtilities.invokeLater(() -> {
                         setTitle("ChatApp — [ADMIN]");
@@ -958,8 +1032,11 @@ public final class Client extends JFrame {
                     byte[] reg = ("REGISTER|" + username).getBytes(StandardCharsets.UTF_8);
                     ds.send(new DatagramPacket(reg, reg.length, InetAddress.getByName(host), udpPort));
 
-                    tcpSocket = s; tcpIn = in; tcpOut = out;
-                    udpSocket = ds; isAdmin = false;
+                    tcpSocket = s;
+                    tcpIn = in;
+                    tcpOut = out;
+                    udpSocket = ds;
+                    isAdmin = false;
 
                     SwingUtilities.invokeLater(() -> {
                         setTitle("ChatApp — " + username);
@@ -981,12 +1058,13 @@ public final class Client extends JFrame {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    //  TCP READ LOOP
+    // TCP READ LOOP
     // ═══════════════════════════════════════════════════════════════════════════
     private void tcpReadLoop() {
         try {
             DataInputStream in = tcpIn;
-            if (in == null) return;
+            if (in == null)
+                return;
             while (!closing) {
                 String line = in.readUTF().trim();
                 if (line.startsWith("JOINED_ROOM|")) {
@@ -998,12 +1076,16 @@ public final class Client extends JFrame {
                     SwingUtilities.invokeLater(this::backToWaitingUi);
                 } else if (line.startsWith("SYSTEM|")) {
                     String sys = line.substring("SYSTEM|".length());
-                    SwingUtilities.invokeLater(() -> { if (currentRoom != null) addSystemBubble(sys); });
+                    SwingUtilities.invokeLater(() -> {
+                        if (currentRoom != null)
+                            addSystemBubble(sys);
+                    });
                 } else if ("FILE_RECV".equals(line)) {
                     String from = in.readUTF();
-                    String fn   = in.readUTF();
-                    int len     = in.readInt();
-                    if (len < 0 || len > Server.MAX_FILE_BYTES) break;
+                    String fn = in.readUTF();
+                    int len = in.readInt();
+                    if (len < 0 || len > Server.MAX_FILE_BYTES)
+                        break;
                     byte[] data = new byte[len];
                     in.readFully(data);
                     SwingUtilities.invokeLater(() -> addFileBubble(from, fn, data, false));
@@ -1012,44 +1094,59 @@ public final class Client extends JFrame {
         } catch (EOFException ignored) {
         } catch (IOException ignored) {
         } finally {
-            if (!closing) SwingUtilities.invokeLater(() -> {
-                JOptionPane.showMessageDialog(this, "Đã mất kết nối.", "Ngắt kết nối", JOptionPane.WARNING_MESSAGE);
-                disconnectToLogin();
-            });
+            if (!closing)
+                SwingUtilities.invokeLater(() -> {
+                    JOptionPane.showMessageDialog(this, "Đã mất kết nối.", "Ngắt kết nối", JOptionPane.WARNING_MESSAGE);
+                    disconnectToLogin();
+                });
         }
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    //  ADMIN READ LOOP
+    // ADMIN READ LOOP
     // ═══════════════════════════════════════════════════════════════════════════
     private void adminReadLoop() {
         try {
             DataInputStream in = adminTcpIn;
-            if (in == null) return;
+            if (in == null)
+                return;
             while (!closing) {
                 String line;
-                try { line = in.readUTF().trim(); }
-                catch (EOFException | SocketException e) { break; }
+                try {
+                    line = in.readUTF().trim();
+                } catch (EOFException | SocketException e) {
+                    break;
+                }
                 processAdminEvent(line);
             }
         } catch (IOException ignored) {
         } finally {
-            if (!closing) SwingUtilities.invokeLater(() -> {
-                JOptionPane.showMessageDialog(this, "Mất kết nối admin.", "Ngắt kết nối", JOptionPane.WARNING_MESSAGE);
-                disconnectToLogin();
-            });
+            if (!closing)
+                SwingUtilities.invokeLater(() -> {
+                    JOptionPane.showMessageDialog(this, "Mất kết nối admin.", "Ngắt kết nối",
+                            JOptionPane.WARNING_MESSAGE);
+                    disconnectToLogin();
+                });
         }
     }
 
     private void processAdminEvent(String event) {
-        if      (event.startsWith("SNAPSHOT|"))         parseAndApplySnapshot(event);
-        else if (event.startsWith("USER_CONNECTED|"))   SwingUtilities.invokeLater(() -> adminAppendLog("[+] Kết nối: " + event.substring(15)));
-        else if (event.startsWith("USER_DISCONNECTED|"))SwingUtilities.invokeLater(() -> adminAppendLog("[-] Rời: " + event.substring(17)));
-        else if (event.startsWith("USER_ROOM_CHANGED|"))SwingUtilities.invokeLater(() -> adminAppendLog("[↔] " + event.substring(17).replace("|", " → ")));
-        else if (event.startsWith("ROOM_CREATED|"))     SwingUtilities.invokeLater(() -> adminAppendLog("[+] Phòng mới: " + event.substring(13)));
-        else if (event.startsWith("ROOM_DELETED|"))     SwingUtilities.invokeLater(() -> adminAppendLog("[x] Xóa phòng: " + event.substring(13)));
-        else if (event.startsWith("ADMIN_ACK|"))        SwingUtilities.invokeLater(() -> adminAppendLog("[OK] " + event.substring(10)));
-        else if (event.startsWith("ADMIN_ERR|"))        SwingUtilities.invokeLater(() -> adminAppendLog("[ERR] " + event.substring(10)));
+        if (event.startsWith("SNAPSHOT|"))
+            parseAndApplySnapshot(event);
+        else if (event.startsWith("USER_CONNECTED|"))
+            SwingUtilities.invokeLater(() -> adminAppendLog("[+] Kết nối: " + event.substring(15)));
+        else if (event.startsWith("USER_DISCONNECTED|"))
+            SwingUtilities.invokeLater(() -> adminAppendLog("[-] Rời: " + event.substring(17)));
+        else if (event.startsWith("USER_ROOM_CHANGED|"))
+            SwingUtilities.invokeLater(() -> adminAppendLog("[↔] " + event.substring(17).replace("|", " → ")));
+        else if (event.startsWith("ROOM_CREATED|"))
+            SwingUtilities.invokeLater(() -> adminAppendLog("[+] Phòng mới: " + event.substring(13)));
+        else if (event.startsWith("ROOM_DELETED|"))
+            SwingUtilities.invokeLater(() -> adminAppendLog("[x] Xóa phòng: " + event.substring(13)));
+        else if (event.startsWith("ADMIN_ACK|"))
+            SwingUtilities.invokeLater(() -> adminAppendLog("[OK] " + event.substring(10)));
+        else if (event.startsWith("ADMIN_ERR|"))
+            SwingUtilities.invokeLater(() -> adminAppendLog("[ERR] " + event.substring(10)));
         if (!event.startsWith("ADMIN_ACK") && !event.startsWith("ADMIN_ERR"))
             adminSendCmd("REQUEST_SNAPSHOT");
     }
@@ -1061,55 +1158,88 @@ public final class Client extends JFrame {
         java.util.Map<String, java.util.List<String>> rooms = new java.util.LinkedHashMap<>();
         for (String sec : sections) {
             if (sec.startsWith("ONLINE:"))
-                for (String u : sec.substring(7).split(",")) { if (!u.isBlank()) online.add(u.trim()); }
+                for (String u : sec.substring(7).split(",")) {
+                    if (!u.isBlank())
+                        online.add(u.trim());
+                }
             else if (sec.startsWith("WAITING:"))
-                for (String u : sec.substring(8).split(",")) { if (!u.isBlank()) waiting.add(u.trim()); }
+                for (String u : sec.substring(8).split(",")) {
+                    if (!u.isBlank())
+                        waiting.add(u.trim());
+                }
             else if (sec.startsWith("ROOMS:"))
                 for (String entry : sec.substring(6).split(",")) {
-                    if (entry.isBlank()) continue;
+                    if (entry.isBlank())
+                        continue;
                     int eq = entry.indexOf('=');
-                    if (eq < 0) { rooms.put(entry.trim(), new java.util.ArrayList<>()); continue; }
+                    if (eq < 0) {
+                        rooms.put(entry.trim(), new java.util.ArrayList<>());
+                        continue;
+                    }
                     String rn = entry.substring(0, eq).trim();
                     java.util.List<String> ms = new java.util.ArrayList<>();
-                    for (String m : entry.substring(eq+1).split(";")) if (!m.isBlank()) ms.add(m.trim());
+                    for (String m : entry.substring(eq + 1).split(";"))
+                        if (!m.isBlank())
+                            ms.add(m.trim());
                     rooms.put(rn, ms);
                 }
         }
         final Object selRoom = cbAdminRooms.getSelectedItem();
         SwingUtilities.invokeLater(() -> {
-            adminOnlineModel.clear(); adminWaitingModel.clear(); adminRoomsModel.clear();
-            cbAdminWaiting.removeAllItems(); cbAdminRooms.removeAllItems();
-            for (String u : online)   adminOnlineModel.addElement(u);
-            for (String u : waiting)  { adminWaitingModel.addElement(u); cbAdminWaiting.addItem(u); }
-            for (String r : rooms.keySet()) { adminRoomsModel.addElement(r); cbAdminRooms.addItem(r); }
-            if (selRoom != null) cbAdminRooms.setSelectedItem(selRoom);
+            adminOnlineModel.clear();
+            adminWaitingModel.clear();
+            adminRoomsModel.clear();
+            cbAdminWaiting.removeAllItems();
+            cbAdminRooms.removeAllItems();
+            for (String u : online)
+                adminOnlineModel.addElement(u);
+            for (String u : waiting) {
+                adminWaitingModel.addElement(u);
+                cbAdminWaiting.addItem(u);
+            }
+            for (String r : rooms.keySet()) {
+                adminRoomsModel.addElement(r);
+                cbAdminRooms.addItem(r);
+            }
+            if (selRoom != null)
+                cbAdminRooms.setSelectedItem(selRoom);
             cbAdminInRoom.removeAllItems();
             Object cur = cbAdminRooms.getSelectedItem();
             if (cur != null) {
                 java.util.List<String> ms = rooms.get(cur.toString());
-                if (ms != null) for (String m : ms) cbAdminInRoom.addItem(m);
+                if (ms != null)
+                    for (String m : ms)
+                        cbAdminInRoom.addItem(m);
             }
         });
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    //  UDP READ LOOP
+    // UDP READ LOOP
     // ═══════════════════════════════════════════════════════════════════════════
     private void udpReadLoop() {
         byte[] buf = new byte[65507];
         while (!closing) {
             DatagramSocket ds = udpSocket;
-            if (ds == null || ds.isClosed()) break;
+            if (ds == null || ds.isClosed())
+                break;
             DatagramPacket p = new DatagramPacket(buf, buf.length);
-            try { ds.receive(p); } catch (IOException e) { break; }
+            try {
+                ds.receive(p);
+            } catch (IOException e) {
+                break;
+            }
             String msg = new String(p.getData(), 0, p.getLength(), StandardCharsets.UTF_8).trim();
-            if (!msg.startsWith("ROOM_MSG|")) continue;
+            if (!msg.startsWith("ROOM_MSG|"))
+                continue;
             String rest = msg.substring("ROOM_MSG|".length());
             String[] parts = rest.split("\\|", 3);
-            if (parts.length < 3) continue;
+            if (parts.length < 3)
+                continue;
             String room = parts[0], user = parts[1], payload = parts[2];
             String cr = currentRoom;
-            if (cr == null || !cr.equals(room)) continue;
+            if (cr == null || !cr.equals(room))
+                continue;
             boolean isMe = user.equals(username);
             if (payload.startsWith("STICKER|")) {
                 String em = payload.substring("STICKER|".length());
@@ -1121,14 +1251,16 @@ public final class Client extends JFrame {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    //  SEND HELPERS
+    // SEND HELPERS
     // ═══════════════════════════════════════════════════════════════════════════
     private void sendTextUdp() {
         String text = isPlaceholder(tfMsg, PH_MSG) ? "" : tfMsg.getText().trim();
-        if (text.isEmpty()) return;
+        if (text.isEmpty())
+            return;
         sendRoomUdpPayload(text);
         addTextBubble(username, text, true);
-        tfMsg.setText(""); tfMsg.setForeground(UiTheme.TEXT);
+        tfMsg.setText("");
+        tfMsg.setForeground(UiTheme.TEXT);
     }
 
     private void sendStickerUdp(String emoji) {
@@ -1138,25 +1270,34 @@ public final class Client extends JFrame {
 
     private void sendRoomUdpPayload(String payload) {
         String room = currentRoom, u = username, host = serverHost;
-        if (room == null || u == null || host == null) return;
+        if (room == null || u == null || host == null)
+            return;
         DatagramSocket ds = udpSocket;
-        if (ds == null) return;
+        if (ds == null)
+            return;
         int udpPort;
-        try { udpPort = Integer.parseInt(tfUdpPort.getText().trim()); }
-        catch (NumberFormatException e) { udpPort = Server.UDP_PORT; }
+        try {
+            udpPort = Integer.parseInt(tfUdpPort.getText().trim());
+        } catch (NumberFormatException e) {
+            udpPort = Server.UDP_PORT;
+        }
         String packet = "ROOM_MSG|" + room + "|" + u + "|" + payload;
         byte[] data = packet.getBytes(StandardCharsets.UTF_8);
-        if (data.length > 65507) return;
-        try { ds.send(new DatagramPacket(data, data.length, InetAddress.getByName(host), udpPort)); }
-        catch (IOException ex) {
+        if (data.length > 65507)
+            return;
+        try {
+            ds.send(new DatagramPacket(data, data.length, InetAddress.getByName(host), udpPort));
+        } catch (IOException ex) {
             JOptionPane.showMessageDialog(this, "Gửi thất bại: " + ex.getMessage(), "Lỗi", JOptionPane.ERROR_MESSAGE);
         }
     }
 
     private void pickAndSendFile() {
-        if (currentRoom == null || tcpOut == null) return;
+        if (currentRoom == null || tcpOut == null)
+            return;
         JFileChooser jfc = new JFileChooser();
-        if (jfc.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) return;
+        if (jfc.showOpenDialog(this) != JFileChooser.APPROVE_OPTION)
+            return;
         java.io.File f = jfc.getSelectedFile();
         new Thread(() -> {
             try {
@@ -1168,8 +1309,11 @@ public final class Client extends JFrame {
                 }
                 DataOutputStream out = tcpOut;
                 synchronized (out) {
-                    out.writeUTF("FILE"); out.writeUTF(f.getName());
-                    out.writeLong(buf.length); out.write(buf); out.flush();
+                    out.writeUTF("FILE");
+                    out.writeUTF(f.getName());
+                    out.writeLong(buf.length);
+                    out.write(buf);
+                    out.flush();
                 }
                 SwingUtilities.invokeLater(() -> addFileBubble(username, f.getName(), buf, true));
             } catch (Exception ex) {
@@ -1180,7 +1324,7 @@ public final class Client extends JFrame {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    //  BUBBLE COMPONENTS
+    // BUBBLE COMPONENTS
     // ═══════════════════════════════════════════════════════════════════════════
 
     private void addTextBubble(String user, String text, boolean isMe) {
@@ -1208,7 +1352,8 @@ public final class Client extends JFrame {
         }
 
         JLabel bubble = new JLabel("<html><body style='width:230px;margin:0'>" + escHtml(text) + "</body></html>") {
-            @Override protected void paintComponent(Graphics g) {
+            @Override
+            protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setColor(isMe ? UiTheme.BUBBLE_ME : UiTheme.BUBBLE_OTHER);
@@ -1260,14 +1405,15 @@ public final class Client extends JFrame {
         row.setOpaque(false);
         row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
         JLabel lbl = new JLabel(text) {
-            @Override protected void paintComponent(Graphics g) {
+            @Override
+            protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setColor(UiTheme.SYSTEM_BG);
                 g2.fillRoundRect(0, 0, getWidth(), getHeight(), getHeight(), getHeight());
                 g2.setColor(new Color(0xF0E0A0));
                 g2.setStroke(new BasicStroke(1f));
-                g2.drawRoundRect(0, 0, getWidth()-1, getHeight()-1, getHeight(), getHeight());
+                g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, getHeight(), getHeight());
                 g2.dispose();
                 super.paintComponent(g);
             }
@@ -1286,7 +1432,8 @@ public final class Client extends JFrame {
         JPanel row = new JPanel(new FlowLayout(isMe ? FlowLayout.RIGHT : FlowLayout.LEFT, 10, 4));
         row.setOpaque(false);
         JPanel box = new JPanel(new BorderLayout(6, 6)) {
-            @Override protected void paintComponent(Graphics g) {
+            @Override
+            protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g2.setColor(isMe ? UiTheme.BUBBLE_ME : UiTheme.BUBBLE_OTHER);
@@ -1308,7 +1455,8 @@ public final class Client extends JFrame {
                 double sc = Math.min(1.0, Math.min(
                         (double) UiTheme.IMAGE_PREVIEW_MAX_W / w,
                         (double) UiTheme.IMAGE_PREVIEW_MAX_H / h));
-                Image scaled = bi.getScaledInstance(Math.max(1,(int)(w*sc)), Math.max(1,(int)(h*sc)), Image.SCALE_SMOOTH);
+                Image scaled = bi.getScaledInstance(Math.max(1, (int) (w * sc)), Math.max(1, (int) (h * sc)),
+                        Image.SCALE_SMOOTH);
                 box.add(new JLabel(new ImageIcon(scaled)), BorderLayout.CENTER);
             } else {
                 JLabel inf = new JLabel("[file] " + fileName);
@@ -1335,20 +1483,23 @@ public final class Client extends JFrame {
     }
 
     private void clearChatFeed() {
-        chatFeed.removeAll(); chatFeed.revalidate(); chatFeed.repaint();
+        chatFeed.removeAll();
+        chatFeed.revalidate();
+        chatFeed.repaint();
     }
 
     private static String escHtml(String s) {
-        return s.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace("\n","<br/>");
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br/>");
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    //  UI STATE TRANSITIONS
+    // UI STATE TRANSITIONS
     // ═══════════════════════════════════════════════════════════════════════════
     private void showWaitUi() {
         dotPhase = 0;
-        if (waitTimer != null) waitTimer.stop();
-        String[] frames = {"◌", "◍", "●", "◍"};
+        if (waitTimer != null)
+            waitTimer.stop();
+        String[] frames = { "◌", "◍", "●", "◍" };
         waitTimer = new Timer(400, e -> {
             dotPhase = (dotPhase + 1) % frames.length;
             lblWaitDot.setText(frames[dotPhase]);
@@ -1360,7 +1511,10 @@ public final class Client extends JFrame {
     }
 
     private void switchToChat(String room) {
-        if (waitTimer != null) { waitTimer.stop(); waitTimer = null; }
+        if (waitTimer != null) {
+            waitTimer.stop();
+            waitTimer = null;
+        }
         lblRoomHeader.setText("Phòng: " + room);
         lblOnlineCount.setText("● Đang online");
         clearChatFeed();
@@ -1373,7 +1527,8 @@ public final class Client extends JFrame {
     }
 
     private void backToWaitingUi() {
-        if (waitTimer != null) waitTimer.stop();
+        if (waitTimer != null)
+            waitTimer.stop();
         clearChatFeed();
         showWaitUi();
     }
@@ -1387,18 +1542,40 @@ public final class Client extends JFrame {
 
     private void stopNetworking() {
         closing = true;
-        if (waitTimer != null) { waitTimer.stop(); waitTimer = null; }
-        Socket s = tcpSocket; tcpSocket = null; tcpIn = null; tcpOut = null;
-        if (s != null) try { s.close(); } catch (IOException ignored) {}
-        DatagramSocket ds = udpSocket; udpSocket = null;
-        if (ds != null && !ds.isClosed()) ds.close();
-        Socket as = adminTcpSocket; adminTcpSocket = null; adminTcpIn = null; adminTcpOut = null;
-        if (as != null) try { as.close(); } catch (IOException ignored) {}
-        currentRoom = null; username = null; serverHost = null; isAdmin = false;
+        if (waitTimer != null) {
+            waitTimer.stop();
+            waitTimer = null;
+        }
+        Socket s = tcpSocket;
+        tcpSocket = null;
+        tcpIn = null;
+        tcpOut = null;
+        if (s != null)
+            try {
+                s.close();
+            } catch (IOException ignored) {
+            }
+        DatagramSocket ds = udpSocket;
+        udpSocket = null;
+        if (ds != null && !ds.isClosed())
+            ds.close();
+        Socket as = adminTcpSocket;
+        adminTcpSocket = null;
+        adminTcpIn = null;
+        adminTcpOut = null;
+        if (as != null)
+            try {
+                as.close();
+            } catch (IOException ignored) {
+            }
+        currentRoom = null;
+        username = null;
+        serverHost = null;
+        isAdmin = false;
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    //  EMOJI / STICKER
+    // EMOJI / STICKER
     // ═══════════════════════════════════════════════════════════════════════════
     private void showEmojiPopup(JButton anchor) {
         JPopupMenu pop = new JPopupMenu();
@@ -1408,13 +1585,21 @@ public final class Client extends JFrame {
         for (String em : INLINE_EMOJIS) {
             JButton b = new JButton(em);
             b.setFont(b.getFont().deriveFont(18f));
-            b.setFocusPainted(false); b.setOpaque(false);
-            b.setContentAreaFilled(false); b.setBorderPainted(false);
+            b.setFocusPainted(false);
+            b.setOpaque(false);
+            b.setContentAreaFilled(false);
+            b.setBorderPainted(false);
             b.addActionListener(ev -> {
-                if (isPlaceholder(tfMsg, PH_MSG)) { tfMsg.setText(""); tfMsg.setForeground(UiTheme.TEXT); }
+                if (isPlaceholder(tfMsg, PH_MSG)) {
+                    tfMsg.setText("");
+                    tfMsg.setForeground(UiTheme.TEXT);
+                }
                 int pos = Math.min(tfMsg.getCaretPosition(), tfMsg.getText().length());
-                try { tfMsg.getDocument().insertString(pos, em, null); }
-                catch (BadLocationException ex) { tfMsg.setText(tfMsg.getText() + em); }
+                try {
+                    tfMsg.getDocument().insertString(pos, em, null);
+                } catch (BadLocationException ex) {
+                    tfMsg.setText(tfMsg.getText() + em);
+                }
                 pop.setVisible(false);
             });
             grid.add(b);
@@ -1424,20 +1609,24 @@ public final class Client extends JFrame {
     }
 
     private void showStickerPicker() {
-        if (currentRoom == null) return;
+        if (currentRoom == null)
+            return;
         int opt = JOptionPane.showOptionDialog(this, "Chọn sticker:", "Nhãn dán",
                 JOptionPane.DEFAULT_OPTION, JOptionPane.PLAIN_MESSAGE, null, STICKERS, STICKERS[0]);
-        if (opt >= 0) sendStickerUdp(STICKERS[opt]);
+        if (opt >= 0)
+            sendStickerUdp(STICKERS[opt]);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    //  MAIN
+    // MAIN
     // ═══════════════════════════════════════════════════════════════════════════
     public static void main(String[] args) {
         System.setProperty("java.net.preferIPv4Stack", "true");
         System.out.println("ChatApp Client v2.0");
-        try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); }
-        catch (Exception ignored) {}
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        } catch (Exception ignored) {
+        }
         SwingUtilities.invokeLater(() -> new Client().setVisible(true));
     }
 }
