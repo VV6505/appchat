@@ -15,9 +15,6 @@ import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 
-/**
- * Client – Giao diện Zalo-style với sidebar, room list, bubble chat hiện đại.
- */
 public final class Client extends JFrame {
 
     private static final String PH_MSG = "Nhập tin nhắn...";
@@ -51,6 +48,7 @@ public final class Client extends JFrame {
     private Timer waitTimer;
 
     // ── Chat screen ────────────────────────────────────────────────────────────
+    private final java.util.Map<String, JPanel> roomFeeds = new java.util.HashMap<>();
     private JPanel chatFeed;
     private JScrollPane chatScroll;
     private final JTextField tfMsg = new JTextField();
@@ -96,7 +94,7 @@ public final class Client extends JFrame {
         getContentPane().setBackground(UiTheme.BG);
         setUndecorated(false);
 
-        // Root: sidebar trái + content phải
+        // sidebar trái + content phải
         JPanel root = new JPanel(new BorderLayout());
         root.setBackground(UiTheme.SIDEBAR_BG);
 
@@ -177,7 +175,6 @@ public final class Client extends JFrame {
         sb.add(gearBtn);
         sb.add(Box.createRigidArea(new Dimension(0, 8)));
 
-        // Avatar — vẽ bằng Graphics2D, luôn hiển thị đúng
         JLabel avatarMe = new JLabel("?", SwingConstants.CENTER) {
             @Override
             protected void paintComponent(Graphics g) {
@@ -616,11 +613,11 @@ public final class Client extends JFrame {
         rightBtns.setOpaque(false);
 
         // Nút emoji
-        JButton btnEmoji = makeTextToolBtn("☺ Emoji");
+        JButton btnEmoji = makeTextToolBtn("Emoji");
         btnEmoji.addActionListener(e -> showEmojiPopup(btnEmoji));
 
         // Nút "Tệp ▾" — sổ popup chọn: Nhãn dán / Đính kèm tệp
-        JButton btnAttach = makeTextToolBtn("Tệp  v");
+        JButton btnAttach = makeTextToolBtn("Đính kèm");
         JPopupMenu attachMenu = new JPopupMenu();
         attachMenu.setBackground(UiTheme.SURFACE);
 
@@ -656,30 +653,10 @@ public final class Client extends JFrame {
     /** Nút tool nhỏ trong input bar dùng text thuần, không phụ thuộc emoji */
     private JButton makeTextToolBtn(String label) {
         JButton b = new JButton(label);
-        b.setFont(UiTheme.uiFont(Font.PLAIN, 12));
-        b.setForeground(UiTheme.MUTED);
-        b.setFocusPainted(false);
-        b.setOpaque(false);
-        b.setContentAreaFilled(false);
-        b.setBorderPainted(false);
-        b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        UiTheme.styleSecondaryButton(b);
         b.setBorder(BorderFactory.createCompoundBorder(
                 new UiTheme.RoundedBorder(8, UiTheme.BORDER, 1),
-                BorderFactory.createEmptyBorder(5, 10, 5, 10)));
-        // Hover
-        b.addMouseListener(new java.awt.event.MouseAdapter() {
-            @Override
-            public void mouseEntered(java.awt.event.MouseEvent e) {
-                b.setForeground(UiTheme.PRIMARY);
-                b.repaint();
-            }
-
-            @Override
-            public void mouseExited(java.awt.event.MouseEvent e) {
-                b.setForeground(UiTheme.MUTED);
-                b.repaint();
-            }
-        });
+                BorderFactory.createEmptyBorder(6, 12, 6, 12)));
         return b;
     }
 
@@ -869,7 +846,7 @@ public final class Client extends JFrame {
         g.gridy = row;
         g.gridwidth = 4;
         g.anchor = GridBagConstraints.EAST;
-        JButton btnRefresh = new JButton("↺  Làm mới");
+        JButton btnRefresh = new JButton("Làm mới");
         UiTheme.styleSecondaryButton(btnRefresh);
         btnRefresh.addActionListener(e -> adminSendCmd("REQUEST_SNAPSHOT"));
         ctrlCard.add(btnRefresh, g);
@@ -1131,7 +1108,7 @@ public final class Client extends JFrame {
                     String sys = line.substring("SYSTEM|".length());
                     SwingUtilities.invokeLater(() -> {
                         if (currentRoom != null)
-                            addSystemBubble(sys);
+                            addSystemBubble(currentRoom, sys);
                     });
                 } else if ("FILE_RECV".equals(line)) {
                     String from = in.readUTF();
@@ -1141,7 +1118,8 @@ public final class Client extends JFrame {
                         break;
                     byte[] data = new byte[len];
                     in.readFully(data);
-                    SwingUtilities.invokeLater(() -> addFileBubble(from, fn, data, false));
+                    String targetRoom = in.readUTF();
+                    SwingUtilities.invokeLater(() -> addFileBubble(targetRoom, from, fn, data, false));
                 }
             }
         } catch (EOFException ignored) {
@@ -1330,15 +1308,12 @@ public final class Client extends JFrame {
             if (parts.length < 3)
                 continue;
             String room = parts[0], user = parts[1], payload = parts[2];
-            String cr = currentRoom;
-            if (cr == null || !cr.equals(room))
-                continue;
             boolean isMe = user.equals(username);
             if (payload.startsWith("STICKER|")) {
                 String em = payload.substring("STICKER|".length());
-                SwingUtilities.invokeLater(() -> addStickerBubble(user, em, isMe));
+                SwingUtilities.invokeLater(() -> addStickerBubble(room, user, em, isMe));
             } else {
-                SwingUtilities.invokeLater(() -> addTextBubble(user, payload, isMe));
+                SwingUtilities.invokeLater(() -> addTextBubble(room, user, payload, isMe));
             }
         }
     }
@@ -1351,14 +1326,14 @@ public final class Client extends JFrame {
         if (text.isEmpty())
             return;
         sendRoomUdpPayload(text);
-        addTextBubble(username, text, true);
+        addTextBubble(currentRoom, username, text, true);
         tfMsg.setText("");
         tfMsg.setForeground(UiTheme.TEXT);
     }
 
     private void sendStickerUdp(String emoji) {
         sendRoomUdpPayload("STICKER|" + emoji);
-        addStickerBubble(username, emoji, true);
+        addStickerBubble(currentRoom, username, emoji, true);
     }
 
     private void sendRoomUdpPayload(String payload) {
@@ -1406,9 +1381,10 @@ public final class Client extends JFrame {
                     out.writeUTF(f.getName());
                     out.writeLong(buf.length);
                     out.write(buf);
+                    out.writeUTF(currentRoom);
                     out.flush();
                 }
-                SwingUtilities.invokeLater(() -> addFileBubble(username, f.getName(), buf, true));
+                SwingUtilities.invokeLater(() -> addFileBubble(currentRoom, username, f.getName(), buf, true));
             } catch (Exception ex) {
                 SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(
                         this, "Gửi file lỗi: " + ex.getMessage(), "Lỗi", JOptionPane.ERROR_MESSAGE));
@@ -1420,7 +1396,19 @@ public final class Client extends JFrame {
     // BUBBLE COMPONENTS
     // ═══════════════════════════════════════════════════════════════════════════
 
-    private void addTextBubble(String user, String text, boolean isMe) {
+    
+    private JPanel getRoomFeed(String room) {
+        if (room == null) room = "";
+        return roomFeeds.computeIfAbsent(room, k -> {
+            JPanel p = new JPanel();
+            p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
+            p.setBackground(UiTheme.BG);
+            p.setBorder(new EmptyBorder(12, 16, 12, 16));
+            return p;
+        });
+    }
+
+    private void addTextBubble(String room, String user, String text, boolean isMe) {
         JPanel row = new JPanel(new FlowLayout(isMe ? FlowLayout.RIGHT : FlowLayout.LEFT, 10, 4));
         row.setOpaque(false);
         row.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
@@ -1473,13 +1461,13 @@ public final class Client extends JFrame {
         group.add(timeLbl);
 
         row.add(group);
-        chatFeed.add(row);
-        chatFeed.add(Box.createRigidArea(new Dimension(0, 2)));
-        chatFeed.revalidate();
-        scrollChatBottom();
+        getRoomFeed(room).add(row);
+        getRoomFeed(room).add(Box.createRigidArea(new Dimension(0, 2)));
+        getRoomFeed(room).revalidate();
+        if (room.equals(currentRoom)) scrollChatBottom();
     }
 
-    private void addStickerBubble(String user, String emoji, boolean isMe) {
+    private void addStickerBubble(String room, String user, String emoji, boolean isMe) {
         JPanel row = new JPanel(new FlowLayout(isMe ? FlowLayout.RIGHT : FlowLayout.LEFT, 10, 4));
         row.setOpaque(false);
         row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 70));
@@ -1487,13 +1475,13 @@ public final class Client extends JFrame {
         lbl.setFont(lbl.getFont().deriveFont(42f));
         lbl.setOpaque(false);
         row.add(lbl);
-        chatFeed.add(row);
-        chatFeed.add(Box.createRigidArea(new Dimension(0, 2)));
-        chatFeed.revalidate();
-        scrollChatBottom();
+        getRoomFeed(room).add(row);
+        getRoomFeed(room).add(Box.createRigidArea(new Dimension(0, 2)));
+        getRoomFeed(room).revalidate();
+        if (room.equals(currentRoom)) scrollChatBottom();
     }
 
-    private void addSystemBubble(String text) {
+    private void addSystemBubble(String room, String text) {
         JPanel row = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 6));
         row.setOpaque(false);
         row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
@@ -1516,12 +1504,12 @@ public final class Client extends JFrame {
         lbl.setOpaque(false);
         lbl.setBorder(new EmptyBorder(5, 16, 5, 16));
         row.add(lbl);
-        chatFeed.add(row);
-        chatFeed.revalidate();
-        scrollChatBottom();
+        getRoomFeed(room).add(row);
+        getRoomFeed(room).revalidate();
+        if (room.equals(currentRoom)) scrollChatBottom();
     }
 
-    private void addFileBubble(String user, String fileName, byte[] data, boolean isMe) {
+    private void addFileBubble(String room, String user, String fileName, byte[] data, boolean isMe) {
         JPanel row = new JPanel(new FlowLayout(isMe ? FlowLayout.RIGHT : FlowLayout.LEFT, 10, 4));
         row.setOpaque(false);
         JPanel box = new JPanel(new BorderLayout(6, 6)) {
@@ -1562,10 +1550,10 @@ public final class Client extends JFrame {
             box.add(inf, BorderLayout.CENTER);
         }
         row.add(box);
-        chatFeed.add(row);
-        chatFeed.add(Box.createRigidArea(new Dimension(0, 2)));
-        chatFeed.revalidate();
-        scrollChatBottom();
+        getRoomFeed(room).add(row);
+        getRoomFeed(room).add(Box.createRigidArea(new Dimension(0, 2)));
+        getRoomFeed(room).revalidate();
+        if (room.equals(currentRoom)) scrollChatBottom();
     }
 
     private void scrollChatBottom() {
@@ -1576,9 +1564,8 @@ public final class Client extends JFrame {
     }
 
     private void clearChatFeed() {
-        chatFeed.removeAll();
-        chatFeed.revalidate();
-        chatFeed.repaint();
+        roomFeeds.clear();
+        chatScroll.setViewportView(new JPanel());
     }
 
     private static String escHtml(String s) {
@@ -1616,7 +1603,7 @@ public final class Client extends JFrame {
         lblChatAvatar.setText(init);
         lblChatAvatar.setBackground(avColor);
 
-        clearChatFeed();
+        chatScroll.setViewportView(getRoomFeed(room));
         cardLayout.show(contentArea, SCREEN_CHAT);
         if (udpReaderThread == null || !udpReaderThread.isAlive()) {
             udpReaderThread = new Thread(this::udpReadLoop, "chatmulti-client-udp");

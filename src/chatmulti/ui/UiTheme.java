@@ -8,10 +8,6 @@ import javax.swing.plaf.basic.BasicScrollBarUI;
 import java.awt.*;
 import java.awt.geom.RoundRectangle2D;
 
-/**
- * UiTheme – Zalo-style design system cho ChatApp.
- * Màu sắc: Indigo/Purple chủ đạo, nền trắng sáng, bubble hiện đại.
- */
 public final class UiTheme {
     private UiTheme() {}
 

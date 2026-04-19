@@ -9,7 +9,7 @@ public final class ClientHandler implements Runnable {
 
     private final Socket socket;
     private final Server server;
-    private final String firstLine; // đã đọc bởi InitialHandshake
+    private final String firstLine;
     private final DataInputStream in;
     private final DataOutputStream out;
     private String username;
