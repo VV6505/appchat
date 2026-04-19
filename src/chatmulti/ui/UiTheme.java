@@ -83,27 +83,36 @@ public final class UiTheme {
         return f;
     }
 
+    private static Font cachedEmojiFont = null;
+
     public static Font loadEmojiFont() {
+        if (cachedEmojiFont != null) {
+            return cachedEmojiFont.deriveFont(Font.PLAIN, 18f);
+        }
         try {
             // Đường dẫn tương ứng với cấu trúc thư mục trong src
             java.io.InputStream is = UiTheme.class.getResourceAsStream("/chatmulti/fonts/NotoColorEmoji.ttf");
             if (is == null) {
-                return new Font("Segoe UI Emoji", Font.PLAIN, 18); // Fallback nếu không tìm thấy file
+                cachedEmojiFont = new Font("Segoe UI Emoji", Font.PLAIN, 18); // Fallback nếu không tìm thấy file
+                return cachedEmojiFont;
             }
             Font font = Font.createFont(Font.TRUETYPE_FONT, is);
             // Đăng ký font với Graphics Environment để sử dụng toàn hệ thống
             GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
             ge.registerFont(font);
             
-            return font.deriveFont(Font.PLAIN, 18f);
+            cachedEmojiFont = font;
+            return cachedEmojiFont.deriveFont(Font.PLAIN, 18f);
         } catch (Exception e) {
             System.err.println("Không thể tải Emoji Font: " + e.getMessage());
-            return new Font("SansSerif", Font.PLAIN, 18);
+            cachedEmojiFont = new Font("SansSerif", Font.PLAIN, 18);
+            return cachedEmojiFont;
         }
     }
 
     public static void styleRoundedField(JTextField tf) {
-        tf.setFont(loadEmojiFont()); // Sử dụng font emoji có màu
+        // Dùng font chuẩn (Segoe UI) để hỗ trợ tốt nhất cho tiếng Việt.
+        tf.setFont(uiFont(Font.PLAIN, 14));
         tf.setOpaque(false);
         tf.setBorder(BorderFactory.createCompoundBorder(
                 new RoundedBorder(22, BORDER, 1),

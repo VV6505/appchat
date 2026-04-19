@@ -20,9 +20,7 @@ public final class Client extends JFrame {
     private static final String PH_MSG = "Nhập tin nhắn...";
     private static final String[] STICKERS = { "👍", "❤️", "😂", "🔥", "🎉", "👋", "✨", "🙏", "😊", "💯" };
     private static final String[] INLINE_EMOJIS = {
-            "😀", "😃", "😄", "😁", "😅", "🤣", "😂", "🙂", "😉", "😊", "😍", "🥰",
-            "😘", "😋", "😎", "🤩", "🥳", "😇", "🤔", "😴", "👍", "👎", "👏", "🙌",
-            "🙏", "💪", "❤️", "💔", "🔥", "✨", "⭐", "💯", "🎉", "🎁", "✅", "❌"
+            "😀", "😃", "😄", "😁", "😅", "🤣", "😂", "🙂", "😉", "😊", "😍", "🥰"
     };
 
     // ── Screens (CardLayout) ───────────────────────────────────────────────────
