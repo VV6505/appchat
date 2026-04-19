@@ -597,9 +597,9 @@ public final class Client extends JFrame {
                 new EmptyBorder(10, 14, 10, 14)));
 
         // Input field bo tròn (chiếm tối đa không gian)
-        // Dùng font Segoe UI làm font chính, nó sẽ tự động fallback sang Segoe UI Emoji 
+        // Dùng font Segoe UI làm font chính, nó sẽ tự động fallback sang Segoe UI Emoji
         // cho các ký tự emoji trên Windows 10/11 mà không làm hỏng font chữ thường.
-        tfMsg.setFont(UiTheme.uiFont(Font.PLAIN, 14)); 
+        tfMsg.setFont(UiTheme.uiFont(Font.PLAIN, 14));
         tfMsg.setBackground(UiTheme.BG);
         tfMsg.setForeground(UiTheme.TEXT);
         tfMsg.setBorder(BorderFactory.createCompoundBorder(
@@ -842,7 +842,7 @@ public final class Client extends JFrame {
         g.gridx = 0;
         g.gridy = row;
         g.gridwidth = 1;
-        ctrlCard.add(adminLabel("Quản lý bộ nhớ"), g);
+        ctrlCard.add(adminLabel("Xóa user"), g);
         g.gridx = 1;
         g.gridwidth = 2;
         g.fill = GridBagConstraints.HORIZONTAL;
@@ -852,9 +852,9 @@ public final class Client extends JFrame {
         btnPurge.addActionListener(e -> {
             String u = JOptionPane.showInputDialog(this, "Nhập tên User muốn xóa sạch dữ liệu:");
             if (u != null && !u.trim().isEmpty()) {
-                int ok = JOptionPane.showConfirmDialog(this, 
-                    "Xác nhận xóa sạch dữ liệu của \"" + u + "\"?\n(Người này sẽ bị mất hết phòng đã tham gia)", 
-                    "Cảnh báo", JOptionPane.YES_NO_OPTION);
+                int ok = JOptionPane.showConfirmDialog(this,
+                        "Xác nhận xóa sạch dữ liệu của \"" + u + "\"?\n(Người này sẽ bị mất hết phòng đã tham gia)",
+                        "Cảnh báo", JOptionPane.YES_NO_OPTION);
                 if (ok == JOptionPane.YES_OPTION) {
                     adminSendCmd("DELETE_USER_DATA|" + u.trim());
                 }
@@ -1066,7 +1066,7 @@ public final class Client extends JFrame {
                     DatagramSocket ds = new DatagramSocket();
                     byte[] reg = ("REGISTER|" + username).getBytes(StandardCharsets.UTF_8);
                     ds.send(new DatagramPacket(reg, reg.length, InetAddress.getByName(host), udpPort));
-                    
+
                     // Gửi lệnh khôi phục session (lấy danh sách phòng cũ)
                     out.writeUTF("GET_MY_ROOMS");
                     out.flush();
@@ -1108,9 +1108,18 @@ public final class Client extends JFrame {
                 String line = in.readUTF().trim();
                 if (line.startsWith("ROOM_LIST|")) {
                     String list = line.substring("ROOM_LIST|".length());
-                    java.util.List<String> rList = list.isEmpty() ? new java.util.ArrayList<>() 
+                    java.util.List<String> rList = list.isEmpty() ? new java.util.ArrayList<>()
                             : java.util.Arrays.asList(list.split(","));
-                    SwingUtilities.invokeLater(() -> updateSidebarRoomList(rList));
+                    SwingUtilities.invokeLater(() -> {
+                        updateSidebarRoomList(rList);
+                        if (rList.isEmpty()) {
+                            currentRoom = null;
+                            backToWaitingUi();
+                        } else if (currentRoom == null || !rList.contains(currentRoom)) {
+                            currentRoom = rList.get(0);
+                            switchToChat(currentRoom);
+                        }
+                    });
                 } else if (line.startsWith("JOINED_ROOM|")) {
                     currentRoom = line.substring("JOINED_ROOM|".length());
                     SwingUtilities.invokeLater(() -> switchToChat(currentRoom));
@@ -1190,8 +1199,20 @@ public final class Client extends JFrame {
             SwingUtilities.invokeLater(() -> adminAppendLog("[OK] " + event.substring(10)));
         else if (event.startsWith("ADMIN_ERR|"))
             SwingUtilities.invokeLater(() -> adminAppendLog("[ERR] " + event.substring(10)));
-        if (!event.startsWith("ADMIN_ACK") && !event.startsWith("ADMIN_ERR"))
+        if (!event.startsWith("ADMIN_ACK") && !event.startsWith("ADMIN_ERR")) {
+            // Không gửi yêu cầu snapshot quá dồn dập
+            requestSnapshotThrottled();
+        }
+    }
+
+    private long lastSnapReq = 0;
+
+    private void requestSnapshotThrottled() {
+        long now = System.currentTimeMillis();
+        if (now - lastSnapReq > 500) { // Tối đa 2 lần/giây
+            lastSnapReq = now;
             adminSendCmd("REQUEST_SNAPSHOT");
+        }
     }
 
     private void parseAndApplySnapshot(String snap) {
@@ -1228,33 +1249,61 @@ public final class Client extends JFrame {
                 }
         }
         final Object selRoom = cbAdminRooms.getSelectedItem();
+        final Object selWait = cbAdminWaiting.getSelectedItem();
+
         SwingUtilities.invokeLater(() -> {
-            adminOnlineModel.clear();
-            adminWaitingModel.clear();
-            adminRoomsModel.clear();
-            cbAdminWaiting.removeAllItems();
-            cbAdminRooms.removeAllItems();
-            for (String u : online)
-                adminOnlineModel.addElement(u);
-            for (String u : waiting) {
-                adminWaitingModel.addElement(u);
-                cbAdminWaiting.addItem(u);
-            }
-            for (String r : rooms.keySet()) {
-                adminRoomsModel.addElement(r);
-                cbAdminRooms.addItem(r);
-            }
+            // Cập nhật các Model (danh sách text)
+            updateListModel(adminOnlineModel, online);
+            updateListModel(adminWaitingModel, waiting);
+            updateListModel(adminRoomsModel, new java.util.ArrayList<>(rooms.keySet()));
+
+            // Cập nhật ComboBox thông minh (không làm giật menu)
+            updateComboSmart(cbAdminWaiting, waiting);
+            updateComboSmart(cbAdminRooms, new java.util.ArrayList<>(rooms.keySet()));
+
             if (selRoom != null)
                 cbAdminRooms.setSelectedItem(selRoom);
-            cbAdminInRoom.removeAllItems();
+            if (selWait != null)
+                cbAdminWaiting.setSelectedItem(selWait);
+
+            // Cập nhật danh sách User trong phòng đang chọn
             Object cur = cbAdminRooms.getSelectedItem();
             if (cur != null) {
                 java.util.List<String> ms = rooms.get(cur.toString());
-                if (ms != null)
-                    for (String m : ms)
-                        cbAdminInRoom.addItem(m);
+                if (ms != null) {
+                    updateComboSmart(cbAdminInRoom, ms);
+                }
+            } else {
+                cbAdminInRoom.removeAllItems();
             }
         });
+    }
+
+    private void updateListModel(DefaultListModel<String> model, java.util.List<String> newData) {
+        model.clear();
+        for (String s : newData)
+            model.addElement(s);
+    }
+
+    private void updateComboSmart(JComboBox<String> combo, java.util.List<String> newData) {
+        int count = combo.getItemCount();
+        if (count == newData.size()) {
+            boolean match = true;
+            for (int i = 0; i < count; i++) {
+                if (!combo.getItemAt(i).equals(newData.get(i))) {
+                    match = false;
+                    break;
+                }
+            }
+            if (match)
+                return;
+        }
+        Object selected = combo.getSelectedItem();
+        combo.removeAllItems();
+        for (String s : newData)
+            combo.addItem(s);
+        if (selected != null)
+            combo.setSelectedItem(selected);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -1560,12 +1609,12 @@ public final class Client extends JFrame {
         }
         lblRoomHeader.setText("Phòng: " + room);
         lblOnlineCount.setText("● Đang online");
-        
+
         String init = UiTheme.initials(room);
         Color avColor = UiTheme.avatarColor(room);
         lblChatAvatar.setText(init);
         lblChatAvatar.setBackground(avColor);
-        
+
         clearChatFeed();
         cardLayout.show(contentArea, SCREEN_CHAT);
         if (udpReaderThread == null || !udpReaderThread.isAlive()) {
@@ -1576,7 +1625,8 @@ public final class Client extends JFrame {
     }
 
     private void updateSidebarRoomList(java.util.List<String> rooms) {
-        if (roomListPanel == null) return;
+        if (roomListPanel == null)
+            return;
         roomListPanel.removeAll();
         if (rooms.isEmpty()) {
             roomListPanel.add(makeRoomListItem("—", "Chưa có phòng", true));
@@ -1586,7 +1636,8 @@ public final class Client extends JFrame {
                 JPanel item = makeRoomListItem(r, active ? "Đang chat" : "Nhấn để vào", active);
                 item.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
                 item.addMouseListener(new java.awt.event.MouseAdapter() {
-                    @Override public void mouseClicked(java.awt.event.MouseEvent e) {
+                    @Override
+                    public void mouseClicked(java.awt.event.MouseEvent e) {
                         currentRoom = r;
                         switchToChat(r);
                         updateSidebarRoomList(rooms); // vẽ lại để cập nhật trạng thái active
