@@ -89,30 +89,17 @@ public final class UiTheme {
         if (cachedEmojiFont != null) {
             return cachedEmojiFont.deriveFont(Font.PLAIN, 18f);
         }
-        try {
-            // Đường dẫn tương ứng với cấu trúc thư mục trong src
-            java.io.InputStream is = UiTheme.class.getResourceAsStream("/chatmulti/fonts/NotoColorEmoji.ttf");
-            if (is == null) {
-                cachedEmojiFont = new Font("Segoe UI Emoji", Font.PLAIN, 18); // Fallback nếu không tìm thấy file
-                return cachedEmojiFont;
-            }
-            Font font = Font.createFont(Font.TRUETYPE_FONT, is);
-            // Đăng ký font với Graphics Environment để sử dụng toàn hệ thống
-            GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
-            ge.registerFont(font);
-            
-            cachedEmojiFont = font;
-            return cachedEmojiFont.deriveFont(Font.PLAIN, 18f);
-        } catch (Exception e) {
-            System.err.println("Không thể tải Emoji Font: " + e.getMessage());
-            cachedEmojiFont = new Font("SansSerif", Font.PLAIN, 18);
-            return cachedEmojiFont;
-        }
+        
+        // CẢNH BÁO: Java Swing KHÔNG hỗ trợ định dạng ảnh Bitmap (CBDT) của NotoColorEmoji.ttf 
+        // dẫn đến việc font này bị tàng hình (trắng bóc) khi được vẽ lên JPopupMenu.
+        // Giải pháp an toàn nhất để bảng Emoji hiển thị được là dùng Segoe UI Emoji mặc định của Windows.
+        cachedEmojiFont = new Font("Segoe UI Emoji", Font.PLAIN, 18);
+        return cachedEmojiFont;
     }
 
     public static void styleRoundedField(JTextField tf) {
-        // Dùng font chuẩn (Segoe UI) để hỗ trợ tốt nhất cho tiếng Việt.
-        tf.setFont(uiFont(Font.PLAIN, 14));
+        // Dùng loadEmojiFont (Segoe UI Emoji) để ô nhập liệu hiển thị được cả chữ và Emoji
+        tf.setFont(loadEmojiFont().deriveFont(Font.PLAIN, 14f));
         tf.setOpaque(false);
         tf.setBorder(BorderFactory.createCompoundBorder(
                 new RoundedBorder(22, BORDER, 1),
